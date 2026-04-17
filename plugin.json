@@ -1,0 +1,35 @@
+{
+  "id": "nodebb-plugin-rules-quiz",
+  "url": "https://github.com/bot-sync-up/nodebb-plugin-rules-quiz",
+  "library": "./library.js",
+  "staticDirs": {
+    "static": "./static"
+  },
+  "templates": "static/templates",
+  "languages": "languages",
+  "defaultLang": "en-GB",
+  "less": [
+    "static/style/quiz.less"
+  ],
+  "scripts": [
+    "static/lib/quiz.js"
+  ],
+  "acpScripts": [
+    "static/lib/admin.js"
+  ],
+  "modules": {
+    "../admin/plugins/rules-quiz.js": "./static/lib/admin.js",
+    "../client/rules-quiz.js": "./static/lib/quiz.js"
+  },
+  "hooks": [
+    { "hook": "static:app.load",            "method": "init" },
+    { "hook": "static:api.routes",          "method": "addRoutes" },
+    { "hook": "filter:admin.header.build",  "method": "addAdminNavigation" },
+    { "hook": "action:user.create",         "method": "onUserCreate" },
+    { "hook": "action:user.loggedIn",       "method": "onUserLoggedIn" },
+    { "hook": "response:router.page",       "method": "gate" },
+    { "hook": "filter:post.create",         "method": "guardPost" },
+    { "hook": "filter:topic.create",        "method": "guardPost" },
+    { "hook": "filter:topic.reply",         "method": "guardPost" }
+  ]
+}

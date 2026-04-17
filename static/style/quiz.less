@@ -1,0 +1,298 @@
+// nodebb-plugin-rules-quiz — user-facing styles
+// All rules scoped under `.rulesquiz-container`.
+
+.rulesquiz-container {
+	max-width: 720px;
+	margin: 1.5rem auto;
+	padding: 0 1rem;
+	font-size: 16px;
+	line-height: 1.55;
+	color: inherit;
+
+	@media (min-width: 720px) {
+		font-size: 18px;
+	}
+
+	.rq-screen {
+		display: none;
+
+		&.active {
+			display: block;
+		}
+	}
+
+	.rq-card {
+		background: var(--bs-body-bg, #fff);
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		border-radius: 12px;
+		padding: 1.5rem;
+		box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+
+		@media (min-width: 720px) {
+			padding: 2rem;
+		}
+	}
+
+	.rq-heading {
+		margin: 0 0 1rem;
+		font-size: 1.6em;
+		font-weight: 600;
+	}
+
+	.rq-rules-link a,
+	.rq-question-rulelink a {
+		text-decoration: underline;
+		word-break: break-all;
+	}
+
+	.rq-rules-body,
+	.rq-intro-body {
+		margin: 1rem 0;
+	}
+
+	.rq-rules-body--plain,
+	.rq-intro-body--plain,
+	.rq-question-body--plain {
+		white-space: pre-wrap;
+		font-family: inherit;
+		background: rgba(0, 0, 0, 0.03);
+		padding: 0.75rem 1rem;
+		border-radius: 8px;
+	}
+
+	.rq-checkbox {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 1.25rem 0;
+		cursor: pointer;
+		user-select: none;
+
+		input[type="checkbox"] {
+			width: 1.1rem;
+			height: 1.1rem;
+			margin: 0;
+		}
+	}
+
+	.rq-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 1.25rem;
+	}
+
+	.rq-btn {
+		appearance: none;
+		border: 1px solid transparent;
+		border-radius: 8px;
+		padding: 0.6rem 1.1rem;
+		font-size: 1em;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background 120ms ease, opacity 120ms ease, transform 60ms ease;
+		text-decoration: none;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+
+		&:disabled,
+		&[disabled] {
+			opacity: 0.55;
+			cursor: not-allowed;
+		}
+
+		&:active:not(:disabled) {
+			transform: translateY(1px);
+		}
+	}
+
+	.rq-btn--primary {
+		background: var(--bs-primary, #2c7be5);
+		color: #fff;
+
+		&:hover:not(:disabled) {
+			background: darken(#2c7be5, 6%);
+		}
+	}
+
+	.rq-btn--ghost {
+		background: transparent;
+		border-color: rgba(0, 0, 0, 0.15);
+		color: inherit;
+
+		&:hover:not(:disabled) {
+			background: rgba(0, 0, 0, 0.04);
+		}
+	}
+
+	.rq-quiz-header {
+		margin-bottom: 1.25rem;
+	}
+
+	.rq-quiz-meta {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.5rem;
+		font-size: 0.95em;
+		opacity: 0.8;
+	}
+
+	.rq-timer {
+		font-variant-numeric: tabular-nums;
+		font-weight: 600;
+	}
+
+	.rq-progress {
+		width: 100%;
+		height: 8px;
+		background: rgba(0, 0, 0, 0.08);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+
+	.rq-progress-bar {
+		height: 100%;
+		width: 0%;
+		background: var(--bs-primary, #2c7be5);
+		transition: width 200ms ease;
+	}
+
+	.rq-question {
+		margin: 1.25rem 0;
+	}
+
+	.rq-question-title {
+		font-size: 1.2em;
+		font-weight: 600;
+		margin: 0 0 0.75rem;
+	}
+
+	.rq-question-image {
+		max-width: 100%;
+		border-radius: 8px;
+		margin: 0.5rem 0;
+	}
+
+	.rq-options {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin-top: 1rem;
+	}
+
+	.rq-option {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		padding: 0.7rem 0.9rem;
+		border: 1px solid rgba(0, 0, 0, 0.12);
+		border-radius: 8px;
+		cursor: pointer;
+		transition: background 120ms ease, border-color 120ms ease;
+
+		&:hover {
+			background: rgba(0, 0, 0, 0.03);
+			border-color: rgba(0, 0, 0, 0.25);
+		}
+
+		input {
+			margin-top: 0.2rem;
+			flex-shrink: 0;
+		}
+	}
+
+	.rq-input {
+		width: 100%;
+		padding: 0.6rem 0.8rem;
+		border: 1px solid rgba(0, 0, 0, 0.15);
+		border-radius: 8px;
+		font-size: 1em;
+		font-family: inherit;
+	}
+
+	.rq-quiz-footer {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin-top: 1.5rem;
+	}
+
+	// Result screen
+	.rq-result {
+		text-align: center;
+	}
+
+	.rq-result-icon {
+		font-size: 3rem;
+		line-height: 1;
+		margin-bottom: 0.5rem;
+	}
+
+	.rq-icon--check {
+		color: #28a745;
+	}
+
+	.rq-icon--x {
+		color: #dc3545;
+	}
+
+	.rq-result-score {
+		font-size: 1.4em;
+		margin: 0.5rem 0 1rem;
+	}
+
+	.rq-result-breakdown {
+		list-style: none;
+		padding: 0;
+		margin: 1rem 0;
+		text-align: start;
+	}
+
+	.rq-result-item {
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		border-radius: 8px;
+		padding: 0.75rem 1rem;
+		margin-bottom: 0.5rem;
+
+		&--correct { border-left: 4px solid #28a745; }
+		&--wrong   { border-left: 4px solid #dc3545; }
+	}
+
+	.rq-result-item-head {
+		display: flex;
+		justify-content: space-between;
+		font-weight: 600;
+	}
+
+	.rq-result-item-explanation {
+		margin-top: 0.5rem;
+		opacity: 0.85;
+	}
+
+	.rq-cooldown,
+	.rq-locked,
+	.rq-daily-limit {
+		padding: 0.75rem 1rem;
+		background: rgba(220, 53, 69, 0.08);
+		border-radius: 8px;
+		display: inline-flex;
+		gap: 0.5rem;
+		align-items: center;
+	}
+}
+
+// RTL overrides — logical properties handle most cases; mirror the
+// few directional accents (border-left on result items).
+[dir="rtl"] .rulesquiz-container {
+	.rq-result-item--correct {
+		border-left: 1px solid rgba(0, 0, 0, 0.1);
+		border-right: 4px solid #28a745;
+	}
+
+	.rq-result-item--wrong {
+		border-left: 1px solid rgba(0, 0, 0, 0.1);
+		border-right: 4px solid #dc3545;
+	}
+}

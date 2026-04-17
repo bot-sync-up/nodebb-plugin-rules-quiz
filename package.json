@@ -1,0 +1,35 @@
+{
+  "name": "nodebb-plugin-rules-quiz",
+  "version": "0.1.0",
+  "description": "Gates new (and optionally existing) NodeBB users behind a configurable forum-rules quiz before they can post.",
+  "main": "library.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bot-sync-up/nodebb-plugin-rules-quiz.git"
+  },
+  "keywords": [
+    "nodebb",
+    "plugin",
+    "quiz",
+    "rules",
+    "onboarding",
+    "gate",
+    "moderation"
+  ],
+  "author": "bot-sync-up",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bot-sync-up/nodebb-plugin-rules-quiz/issues"
+  },
+  "homepage": "https://github.com/bot-sync-up/nodebb-plugin-rules-quiz#readme",
+  "nbbpm": {
+    "compatibility": "^2.0.0 || ^3.0.0 || ^4.0.0"
+  },
+  "dependencies": {
+    "csv-parse": "^5.5.0",
+    "semver": "^7.5.0"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}

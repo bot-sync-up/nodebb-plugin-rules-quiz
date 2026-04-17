@@ -1,0 +1,176 @@
+.acp-page-container .rules-quiz-acp {
+	.rq-page-title {
+		margin-bottom: 4px;
+	}
+	.rq-page-sub {
+		margin-bottom: 16px;
+	}
+
+	// Tabs
+	.rq-tabs {
+		margin-bottom: 16px;
+		.nav-link {
+			cursor: pointer;
+			.badge,
+			.badge-secondary {
+				margin-left: 6px;
+			}
+		}
+	}
+
+	.rq-tab-content {
+		padding-top: 8px;
+	}
+
+	// Generic card wrapper
+	.rq-card {
+		background: #fff;
+		border: 1px solid #e3e6ea;
+		border-radius: 6px;
+		padding: 18px 20px;
+		margin-bottom: 18px;
+
+		h3 {
+			margin-top: 0;
+			margin-bottom: 14px;
+			font-size: 16px;
+			font-weight: 600;
+			color: #2c3e50;
+			border-bottom: 1px solid #eef0f3;
+			padding-bottom: 8px;
+		}
+	}
+
+	// Form rows: label ~150px, fluid fields
+	.rq-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 12px;
+
+		> label {
+			flex: 0 0 150px;
+			margin-bottom: 0;
+			font-weight: 500;
+			color: #444;
+		}
+		> .form-control,
+		> textarea,
+		> select {
+			flex: 1 1 200px;
+			min-width: 200px;
+		}
+		> small {
+			flex: 1 1 100%;
+			margin-left: 160px;
+		}
+	}
+
+	.form-check.form-switch.rq-row {
+		> .form-check-input {
+			flex: 0 0 auto;
+			margin-right: 8px;
+		}
+		> .form-check-label {
+			flex: 1 1 auto;
+		}
+	}
+
+	.rq-actions {
+		text-align: right;
+		padding: 10px 0;
+	}
+
+	// Questions toolbar
+	.rq-toolbar {
+		display: flex;
+		gap: 8px;
+		margin-bottom: 14px;
+		flex-wrap: wrap;
+	}
+
+	// Questions table
+	.rq-questions-table {
+		tbody tr:nth-child(odd) { background: #fafbfc; }
+		tbody tr:hover { background: #f0f4f8; }
+		td, th { vertical-align: middle; }
+	}
+
+	.badge-tag {
+		display: inline-block;
+		padding: 2px 8px;
+		margin: 1px 2px;
+		font-size: 11px;
+		font-weight: 500;
+		color: #fff;
+		background: #6c757d;
+		border-radius: 10px;
+	}
+
+	// Reports cards
+	.rq-stat-card {
+		border-radius: 6px;
+		padding: 18px;
+		margin-bottom: 16px;
+		color: #fff;
+		text-align: center;
+
+		.rq-stat-label {
+			font-size: 13px;
+			opacity: 0.9;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.rq-stat-value {
+			font-size: 32px;
+			font-weight: 700;
+			margin-top: 4px;
+		}
+	}
+	.rq-stat-passed  { background: #28a745; }
+	.rq-stat-failed  { background: #dc3545; }
+	.rq-stat-neutral { background: #6c757d; }
+
+	.rq-chart-wrap {
+		position: relative;
+		min-height: 160px;
+	}
+
+	.rq-daily-fallback table {
+		margin-top: 10px;
+	}
+
+	.rq-hardest .badge { font-size: 12px; }
+
+	.rq-lookup-form {
+		display: flex;
+		gap: 10px;
+		align-items: center;
+		margin-bottom: 14px;
+
+		label { margin-bottom: 0; }
+		input { width: 140px; }
+	}
+
+	// Modal — question editor
+	.rq-question-form {
+		.rq-row > label { flex: 0 0 150px; }
+	}
+
+	.rq-opt-row {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		margin-bottom: 6px;
+
+		.rq-opt-id   { flex: 0 0 80px; }
+		.rq-opt-text { flex: 1 1 auto; }
+		.rq-opt-correct { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+	}
+
+	#rq-q-add-option { margin-top: 6px; }
+
+	// utility
+	.hidden { display: none !important; }
+}
