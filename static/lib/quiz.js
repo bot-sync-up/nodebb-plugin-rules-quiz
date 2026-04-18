@@ -57,10 +57,14 @@ define('forum/plugins/rules-quiz', [
 		const screens = document.querySelectorAll('#rulesquiz-app .rq-screen');
 		for (let i = 0; i < screens.length; i++) {
 			screens[i].classList.remove('active');
+			screens[i].setAttribute('hidden', '');
+			screens[i].style.display = 'none';
 		}
 		const target = document.getElementById(screenId);
 		if (target) {
 			target.classList.add('active');
+			target.removeAttribute('hidden');
+			target.style.display = 'block';
 		}
 	}
 
@@ -589,3 +593,15 @@ define('forum/plugins/rules-quiz', [
 		},
 	};
 });
+
+// Register the same module under the names NodeBB's auto-loader tries to
+// resolve for the `/quiz` route (template path is `quiz/index.tpl`, so the
+// loader asks RequireJS for `forum/quiz/index`). Without this shim the page
+// load errors out early and our inline bootstrap never runs.
+(function () {
+	function shim(name) {
+		define(name, ['forum/plugins/rules-quiz'], function (mod) { return mod; });
+	}
+	shim('forum/quiz/index');
+	shim('forum/quiz/result');
+})();

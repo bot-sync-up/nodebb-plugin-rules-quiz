@@ -19,7 +19,9 @@
   ],
   "modules": {
     "../admin/plugins/rules-quiz.js": "./static/lib/admin.js",
-    "../client/rules-quiz.js": "./static/lib/quiz.js"
+    "../client/rules-quiz.js": "./static/lib/quiz.js",
+    "../client/quiz/index.js": "./static/lib/quiz.js",
+    "../client/quiz/result.js": "./static/lib/quiz.js"
   },
   "hooks": [
     { "hook": "static:app.load",            "method": "init" },

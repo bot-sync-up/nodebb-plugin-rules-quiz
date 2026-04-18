@@ -26,7 +26,7 @@
 
 <div id="rulesquiz-app" class="rulesquiz-container" dir="{{{ if rtl }}}rtl{{{ else }}}ltr{{{ end }}}" lang="{lang}">
 
-	<section id="rulesquiz-rules" class="rq-screen">
+	<section id="rulesquiz-rules" class="rq-screen" hidden style="display:none">
 		<div class="rq-card">
 			<h1 class="rq-heading">[[rulesquiz:rules.heading]]</h1>
 
@@ -57,7 +57,7 @@
 		</div>
 	</section>
 
-	<section id="rulesquiz-intro" class="rq-screen">
+	<section id="rulesquiz-intro" class="rq-screen" hidden style="display:none">
 		<div class="rq-card">
 			<h1 class="rq-heading">[[rulesquiz:intro.heading]]</h1>
 
@@ -77,7 +77,7 @@
 		</div>
 	</section>
 
-	<section id="rulesquiz-quiz" class="rq-screen">
+	<section id="rulesquiz-quiz" class="rq-screen" hidden style="display:none">
 		<div class="rq-card">
 			<header class="rq-quiz-header">
 				<h1 class="rq-heading">[[rulesquiz:title]]</h1>
@@ -100,7 +100,7 @@
 		</div>
 	</section>
 
-	<div id="rulesquiz-result" class="rq-screen"></div>
+	<div id="rulesquiz-result" class="rq-screen" hidden style="display:none"></div>
 
 	<script type="application/json" id="rulesquiz-bootstrap">
 		{
