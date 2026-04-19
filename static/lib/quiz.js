@@ -773,7 +773,10 @@ define('forum/plugins/rules-quiz', [
 					btn.setAttribute('href', redirectTo);
 					btn.addEventListener('click', function (e) { e.preventDefault(); window.location.href = redirectTo; });
 				}
-				setTimeout(function () { window.location.href = redirectTo; }, 3500);
+				// Do NOT auto-redirect — the user must see the per-question
+				// breakdown and click Continue when they're ready. This was
+				// a real UX bug: the result flashed for a second and vanished
+				// before the user could read their feedback.
 				return;
 			}
 			if (showRetry) {
