@@ -71,6 +71,28 @@
 #rulesquiz-app .rq-result-msg{max-width:500px;margin:1rem auto 1.75rem;color:#475569;line-height:1.65}
 #rulesquiz-app .rq-result .rq-actions{justify-content:center}
 #rulesquiz-app .rq-cooldown-counter{font-variant-numeric:tabular-nums;font-weight:700;color:#dc2626;background:#fee2e2;padding:.4rem .9rem;border-radius:8px;display:inline-block;margin-top:.5rem}
+/* Per-question breakdown */
+#rulesquiz-app .rq-pq-list{margin:2rem auto 0;max-width:640px;text-align:start}
+#rulesquiz-app .rq-pq-heading{font-size:1.15em;font-weight:700;margin:0 0 1rem;color:#334155;text-align:center}
+#rulesquiz-app .rq-pq{border:1px solid #e2e8f0;border-radius:10px;margin:.5rem 0;background:#fff;overflow:hidden}
+#rulesquiz-app .rq-pq.rq-pq-correct{border-color:#86efac;background:#f0fdf4}
+#rulesquiz-app .rq-pq.rq-pq-wrong{border-color:#fca5a5;background:#fef2f2}
+#rulesquiz-app .rq-pq summary{padding:.75rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;font-weight:500;list-style:none}
+#rulesquiz-app .rq-pq summary::-webkit-details-marker{display:none}
+#rulesquiz-app .rq-pq summary::after{content:"▸";margin-inline-start:auto;transition:transform .2s ease;opacity:.5}
+#rulesquiz-app .rq-pq[open] summary::after{transform:rotate(90deg)}
+#rulesquiz-app[dir="rtl"] .rq-pq summary::after{content:"◂"}
+#rulesquiz-app[dir="rtl"] .rq-pq[open] summary::after{transform:rotate(-90deg)}
+#rulesquiz-app .rq-pq-icon{flex-shrink:0}
+#rulesquiz-app .rq-pq-num{font-weight:700;color:#64748b;min-width:1.5rem}
+#rulesquiz-app .rq-pq-title{flex:1;color:#1e293b}
+#rulesquiz-app .rq-pq-body{padding:.25rem 1rem 1rem;border-top:1px solid rgba(0,0,0,.06);font-size:.95em}
+#rulesquiz-app .rq-pq-row{margin:.5rem 0;display:flex;flex-wrap:wrap;gap:.35rem}
+#rulesquiz-app .rq-pq-label{color:#64748b;font-weight:600;min-width:110px}
+#rulesquiz-app .rq-pq-value{color:#0f172a}
+#rulesquiz-app .rq-pq-correct-text{color:#166534;font-weight:600;background:#dcfce7;padding:.05rem .5rem;border-radius:6px}
+#rulesquiz-app .rq-pq-explain{margin-top:.6rem;padding:.6rem .8rem;background:rgba(79,124,255,.08);border-inline-start:3px solid #4f7cff;border-radius:6px;color:#334155;line-height:1.55}
+#rulesquiz-app .rq-pq-rulelink{color:#4f7cff;text-decoration:underline;margin-inline-start:.5rem;white-space:nowrap}
 </style>
 
 <div id="rulesquiz-app" class="rulesquiz-container" dir="{{{ if rtl }}}rtl{{{ else }}}ltr{{{ end }}}" lang="{lang}">
