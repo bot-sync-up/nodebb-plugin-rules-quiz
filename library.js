@@ -155,31 +155,89 @@ plugin.gate = async function (data) {
 };
 
 /**
- * filter:post.create / filter:topic.create / filter:topic.reply
- * Blocks writes for users who have not passed when blockMode != modal_soft.
+ * Two-stage gate for writes:
+ *   1. Onboarding gate: user hasn't passed the initial rules quiz at all.
+ *      (Same behavior as before — blocks regardless of kind.)
+ *   2. Per-kind gate: even after onboarding, the first N replies and the
+ *      first M topics each require a fresh mini-quiz. The quiz handshake
+ *      is done via a session-scoped token set by POST /submit on a pass.
+ *
+ * @param {'post'|'topic'} kind  `'post'` for replies, `'topic'` for new topics.
+ * @param {object} data  NodeBB hook payload.
+ * @returns {Promise<object>}
  */
+async function guardKind(kind, data) {
+  const uid = data && (data.uid || (data.data && data.data.uid));
+  if (!uid) return data;
+
+  const settings = await db.getSettings();
+  if (!settings.enabled) return data;
+  if (settings.blockMode === 'modal_soft') return data;
+
+  const user = await getMinimalUser(uid);
+  if (policy.isExempt(user, settings)) return data;
+
+  const state = await db.getUserState(uid);
+
+  // --- Stage 1: onboarding gate --------------------------------------
+  // If they still need the initial quiz, block every kind of write.
+  if (policy.needsQuiz(user, state || {}, settings)) {
+    const e = new Error('[[rulesquiz:error.must_pass_first]]');
+    e.code = 'rules-quiz:not-passed';
+    throw e;
+  }
+
+  // --- Stage 2: per-kind gate ----------------------------------------
+  const gate = kind === 'topic' ? settings.topicGate : settings.postGate;
+  if (!gate || !gate.enabled) return data;
+  const limit = Number(gate.applyForFirstN || 0);
+  if (limit <= 0) return data;
+
+  const countField = kind === 'topic' ? 'topicsCreated' : 'postsCreated';
+  const already = Number((state && state[countField]) || 0);
+  if (already >= limit) return data; // past the gate window — free to post
+
+  // Token handshake via session (set by /submit on a passing mode-aware quiz).
+  const req = (data && (data.req || (data.data && data.data.req))) || null;
+  const session = req && req.session;
+  const tokenField = kind === 'topic' ? 'rqTopicToken' : 'rqPostToken';
+  const token = session && session[tokenField];
+  const now = Date.now();
+  if (token && token.exp && token.exp > now) {
+    // Consume the token (single-use) + increment the kind counter.
+    try { if (session) delete session[tokenField]; } catch (_) { /* noop */ }
+    const nextState = {};
+    nextState[countField] = already + 1;
+    await db.setUserState(uid, nextState);
+    return data;
+  }
+
+  // No valid token — redirect them to the right mini-quiz.
+  const code = kind === 'topic' ? 'rules-quiz:topic-gate' : 'rules-quiz:post-gate';
+  const msg = kind === 'topic'
+    ? '[[rulesquiz:error.need_topic_quiz]]'
+    : '[[rulesquiz:error.need_post_quiz]]';
+  const e = new Error(msg);
+  e.code = code;
+  throw e;
+}
+
 plugin.guardPost = async function (data) {
   try {
-    const uid = data && (data.uid || (data.data && data.data.uid));
-    if (!uid) return data;
-
-    const settings = await db.getSettings();
-    if (!settings.enabled) return data;
-    if (settings.blockMode === 'modal_soft') return data;
-
-    const state = await db.getUserState(uid);
-    if (state && (state.status === 'passed' || state.status === 'exempt')) return data;
-
-    const user = await getMinimalUser(uid);
-    if (policy.isExempt(user, settings)) return data;
-    if (!policy.needsQuiz(user, state || {}, settings)) return data;
-
-    const err = new Error('[[rulesquiz:error.must_pass_first]]');
-    err.code = 'rules-quiz:not-passed';
-    throw err;
+    return await guardKind('post', data);
   } catch (e) {
-    if (e.code === 'rules-quiz:not-passed') throw e;
+    if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
     winston.error('[rules-quiz] guardPost: ' + e.stack);
+    return data;
+  }
+};
+
+plugin.guardTopic = async function (data) {
+  try {
+    return await guardKind('topic', data);
+  } catch (e) {
+    if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
+    winston.error('[rules-quiz] guardTopic: ' + e.stack);
     return data;
   }
 };
