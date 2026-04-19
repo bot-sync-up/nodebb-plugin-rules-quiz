@@ -217,11 +217,28 @@ async function guardKind(kind, data) {
     }
   }
 
+  // Grace period: a single "post reply" action fires multiple hooks in
+  // sequence (filter:post.shouldQueue → filter:post-queue.save OR
+  // filter:topic.reply). The first hook consumes the token; without a
+  // grace window the second hook would reject the same request and the
+  // user loops back to the quiz forever. If the user passed this same
+  // kind within the last 10s, treat it as the same request chain.
+  const GRACE_MS = 10 * 1000;
+  const lastGateAt = Number((state && state.lastGateAt) || 0);
+  const lastGateKind = state && state.lastGateKind;
+  if (lastGateKind === kind && (now - lastGateAt) < GRACE_MS) {
+    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid
+      + ' (grace-period, ' + Math.round((now - lastGateAt) / 1000) + 's since last pass)');
+    return data;
+  }
+
   if (hasToken) {
-    // Consume (single-use) + increment the kind counter.
+    // Consume (single-use) + increment the kind counter + set grace stamp.
     const nextState = {};
     nextState[countField] = already + 1;
     nextState[dbField] = 0;
+    nextState.lastGateAt = now;
+    nextState.lastGateKind = kind;
     await db.setUserState(uid, nextState);
     winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' count=' + (already + 1) + '/' + limit);
     return data;
