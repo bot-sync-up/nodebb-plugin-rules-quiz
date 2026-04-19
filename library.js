@@ -258,6 +258,54 @@ plugin.guardTopic = async function (data) {
   }
 };
 
+/**
+ * filter:post.shouldQueue fires for every reply / topic attempt, BEFORE
+ * NodeBB decides whether to put the post into its moderation queue.
+ * Hooking here lets us gate posts that would otherwise bypass
+ * filter:topic.reply / filter:topic.create via the queue path.
+ *
+ * Payload: { shouldQueue, uid, data }. We leave shouldQueue untouched
+ * — we only throw to reject the attempt entirely.
+ */
+plugin.guardShouldQueue = async function (payload) {
+  try {
+    const uid = payload && payload.uid;
+    if (!uid) return payload;
+    const d = payload.data || {};
+    // Distinguish topic vs reply: new topics have `cid` + `title` and no `tid`;
+    // replies have a `tid`. If we can't tell, assume reply (post gate, the
+    // smaller / more common case).
+    const kind = (d.cid && d.title && !d.tid) ? 'topic' : 'post';
+    await guardKind(kind, { uid: uid, data: d });
+    return payload;
+  } catch (e) {
+    if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
+    winston.error('[rules-quiz] guardShouldQueue: ' + e.stack);
+    return payload;
+  }
+};
+
+/**
+ * filter:post-queue.save is our final line of defense — fires right
+ * before the queued post is actually persisted to the review queue.
+ * If shouldQueue was already past us, this still catches it.
+ */
+plugin.guardQueued = async function (payload) {
+  try {
+    const uid = payload && payload.uid;
+    if (!uid) return payload;
+    const type = payload && payload.type;  // 'reply' | 'topic'
+    const kind = type === 'topic' ? 'topic' : 'post';
+    const d = payload.data || {};
+    await guardKind(kind, { uid: uid, data: d });
+    return payload;
+  } catch (e) {
+    if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
+    winston.error('[rules-quiz] guardQueued: ' + e.stack);
+    return payload;
+  }
+};
+
 async function getMinimalUser(uid) {
   try {
     const user = require.main.require('./src/user');
