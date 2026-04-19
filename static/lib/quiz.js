@@ -753,7 +753,20 @@ define('forum/plugins/rules-quiz', [
 			container.innerHTML = translated;
 			showScreen(SCREEN_RESULT);
 
-			const redirectTo = resp.redirectTo || (state.settings && state.settings.onSuccess && state.settings.onSuccess.redirectTo) || '/';
+			// Priority: server-provided redirectTo (which honors session.rqReturnTo
+			// for gated modes) → sessionStorage cache → generic onSuccess → '/'.
+			let redirectTo = resp.redirectTo;
+			if (!redirectTo) {
+				try {
+					const cached = sessionStorage.getItem('rqReturnTo');
+					if (cached) redirectTo = cached;
+				} catch (_) { /* noop */ }
+			}
+			if (!redirectTo) {
+				redirectTo = (state.settings && state.settings.onSuccess && state.settings.onSuccess.redirectTo) || '/';
+			}
+			try { sessionStorage.removeItem('rqReturnTo'); } catch (_) { /* noop */ }
+
 			if (passed) {
 				const btn = document.getElementById('rq-continue-btn');
 				if (btn) {

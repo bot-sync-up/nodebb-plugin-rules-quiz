@@ -12,7 +12,8 @@
     "static/style/quiz.less"
   ],
   "scripts": [
-    "static/lib/quiz.js"
+    "static/lib/quiz.js",
+    "static/lib/gate-redirect.js"
   ],
   "acpScripts": [
     "static/lib/admin.js"

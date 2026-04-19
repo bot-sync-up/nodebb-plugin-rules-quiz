@@ -213,11 +213,11 @@ async function guardKind(kind, data) {
   }
 
   // No valid token — redirect them to the right mini-quiz.
+  // Embed the gate code in the error message too, so the client-side
+  // gate-redirect.js script can reliably detect it in the toast text.
   const code = kind === 'topic' ? 'rules-quiz:topic-gate' : 'rules-quiz:post-gate';
-  const msg = kind === 'topic'
-    ? '[[rulesquiz:error.need_topic_quiz]]'
-    : '[[rulesquiz:error.need_post_quiz]]';
-  const e = new Error(msg);
+  const key = kind === 'topic' ? 'error.need_topic_quiz' : 'error.need_post_quiz';
+  const e = new Error('[[rulesquiz:' + key + ']] [' + code + ']');
   e.code = code;
   throw e;
 }
