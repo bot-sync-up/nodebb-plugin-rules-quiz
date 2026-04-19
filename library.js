@@ -31,6 +31,14 @@ plugin.init = async function (params) {
   }
 
   try {
+    const seed = require('./lib/seed');
+    const r = await seed.seedIfEmpty(db);
+    if (r.seeded > 0) winston.info('[rules-quiz] seeded ' + r.seeded + ' starter questions');
+  } catch (e) {
+    winston.warn('[rules-quiz] seed failed: ' + e.message);
+  }
+
+  try {
     routes.setup(params);
     winston.info('[rules-quiz] routes mounted');
   } catch (e) {

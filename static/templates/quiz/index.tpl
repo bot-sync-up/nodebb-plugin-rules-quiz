@@ -22,6 +22,8 @@
 #rulesquiz-app .rq-progress-bar{height:100%;background:#2d6cdf;width:0;transition:width .3s}
 #rulesquiz-app .rq-quiz-footer{display:flex;gap:.5rem;margin-top:1.25rem;flex-wrap:wrap}
 #rulesquiz-app[dir="rtl"] .rq-actions,#rulesquiz-app[dir="rtl"] .rq-quiz-footer{flex-direction:row-reverse}
+#rulesquiz-app .rq-empty{text-align:center;padding:2rem;color:#666}
+#rulesquiz-app .rq-loading{text-align:center;padding:2rem;color:#888}
 </style>
 
 <div id="rulesquiz-app" class="rulesquiz-container" dir="{{{ if rtl }}}rtl{{{ else }}}ltr{{{ end }}}" lang="{lang}">
@@ -30,18 +32,21 @@
 		<div class="rq-card">
 			<h1 class="rq-heading">[[rulesquiz:rules.heading]]</h1>
 
-			{{{ if settings.rules.rulesUrl }}}
-			<p class="rq-rules-link">
-				<a href="{settings.rules.rulesUrl}" target="_blank" rel="noopener">{settings.rules.rulesUrl}</a>
-			</p>
-			{{{ end }}}
-
 			{{{ if rulesHtml }}}
 			<div class="rq-rules-body">{rulesHtml}</div>
 			{{{ else }}}
 				{{{ if settings.rules.rulesText }}}
 				<pre class="rq-rules-body rq-rules-body--plain">{settings.rules.rulesText}</pre>
 				{{{ end }}}
+			{{{ end }}}
+
+			{{{ if settings.rules.rulesUrl }}}
+			{{{ if !rulesHtml }}}
+			<p class="rq-rules-link">
+				[[rulesquiz:rules.also_on_forum]]
+				<a href="{settings.rules.rulesUrl}" target="_blank" rel="noopener">[[rulesquiz:rules.open_thread]]</a>
+			</p>
+			{{{ end }}}
 			{{{ end }}}
 
 			<label class="rq-checkbox">
@@ -102,15 +107,7 @@
 
 	<div id="rulesquiz-result" class="rq-screen" hidden style="display:none"></div>
 
-	<script type="application/json" id="rulesquiz-bootstrap">
-		{
-			"questions": {questions:json},
-			"settings": {settings:json},
-			"gateAck": {{{ if gateAck }}}true{{{ else }}}false{{{ end }}},
-			"rtl": {{{ if rtl }}}true{{{ else }}}false{{{ end }}},
-			"lang": "{lang}"
-		}
-	</script>
+	<script type="application/json" id="rulesquiz-bootstrap">{"questions":{questionsJson},"settings":{settingsJson},"gateAck":{{{ if gateAck }}}true{{{ else }}}false{{{ end }}},"rtl":{{{ if rtl }}}true{{{ else }}}false{{{ end }}},"lang":"{lang}"}</script>
 </div>
 
 <script>

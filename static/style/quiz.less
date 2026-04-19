@@ -281,6 +281,28 @@
 		gap: 0.5rem;
 		align-items: center;
 	}
+
+	// Empty / loading / error states shown inside the quiz screen when
+	// there are no questions to render (or the API is still loading).
+	.rq-empty,
+	.rq-loading {
+		text-align: center;
+		padding: 2rem;
+		color: #666;
+
+		.rq-heading {
+			font-size: 1.3em;
+			margin-bottom: 0.75rem;
+		}
+
+		p {
+			margin: 0.25rem 0;
+		}
+	}
+
+	.rq-loading {
+		color: #888;
+	}
 }
 
 // RTL overrides — logical properties handle most cases; mirror the

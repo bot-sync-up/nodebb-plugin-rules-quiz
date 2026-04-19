@@ -87,6 +87,148 @@ define('forum/plugins/rules-quiz', [
 	}
 
 	/**
+	 * Render an arbitrary info state (empty / loading / error) inside the
+	 * quiz screen container, hiding the prev/next/submit footer.
+	 *
+	 * @param {string} heading Already-translated heading text.
+	 * @param {string} body Already-translated body text.
+	 * @param {string} [extraHtml] Optional additional HTML (e.g. a retry button).
+	 * @param {string} [className] Extra class on the wrapper div.
+	 */
+	function renderInfoState(heading, body, extraHtml, className) {
+		const container = document.getElementById('rq-question');
+		if (container) {
+			container.innerHTML =
+				'<div class="' + (className || 'rq-empty') + '">' +
+					'<h2 class="rq-heading">' + esc(heading) + '</h2>' +
+					'<p>' + esc(body) + '</p>' +
+					(extraHtml || '') +
+				'</div>';
+		}
+		const header = document.querySelector('#rulesquiz-quiz .rq-quiz-header');
+		if (header) header.style.display = 'none';
+		const prev = document.getElementById('rq-prev-btn');
+		const next = document.getElementById('rq-next-btn');
+		const submit = document.getElementById('rq-submit-btn');
+		if (prev) prev.hidden = true;
+		if (next) next.hidden = true;
+		if (submit) submit.hidden = true;
+	}
+
+	/**
+	 * Show the "no questions configured" friendly state.
+	 */
+	function showEmptyState() {
+		const doRender = function (heading, body) {
+			showScreen(SCREEN_QUIZ);
+			renderInfoState(heading, body, '', 'rq-empty');
+		};
+		if (translator && typeof translator.translate === 'function') {
+			translator.translate('[[rulesquiz:empty.heading]]', function (h) {
+				translator.translate('[[rulesquiz:empty.body]]', function (b) {
+					doRender(h, b);
+				});
+			});
+		} else {
+			doRender('No questions available yet', 'Administrators haven\'t set up any questions yet. Please try again later.');
+		}
+	}
+
+	/**
+	 * Show a transient "loading…" indicator inside the quiz screen.
+	 */
+	function showLoadingState() {
+		const doRender = function (txt) {
+			showScreen(SCREEN_QUIZ);
+			const container = document.getElementById('rq-question');
+			if (container) {
+				container.innerHTML = '<div class="rq-loading">' + esc(txt) + '</div>';
+			}
+			const header = document.querySelector('#rulesquiz-quiz .rq-quiz-header');
+			if (header) header.style.display = 'none';
+			const prev = document.getElementById('rq-prev-btn');
+			const next = document.getElementById('rq-next-btn');
+			const submit = document.getElementById('rq-submit-btn');
+			if (prev) prev.hidden = true;
+			if (next) next.hidden = true;
+			if (submit) submit.hidden = true;
+		};
+		if (translator && typeof translator.translate === 'function') {
+			translator.translate('[[rulesquiz:loading]]', function (t) {
+				doRender(t && t !== '[[rulesquiz:loading]]' ? t : 'טוען…');
+			});
+		} else {
+			doRender('טוען…');
+		}
+	}
+
+	/**
+	 * Show an error state with a retry button.
+	 *
+	 * @param {Function} onRetry Called when the retry button is clicked.
+	 */
+	function showErrorState(onRetry) {
+		const doRender = function (heading, body, retryLabel) {
+			showScreen(SCREEN_QUIZ);
+			const btnId = 'rq-error-retry-btn';
+			renderInfoState(
+				heading,
+				body,
+				'<button type="button" id="' + btnId + '" class="rq-btn rq-btn--primary" style="margin-top:1rem">' + esc(retryLabel) + '</button>',
+				'rq-empty'
+			);
+			const btn = document.getElementById(btnId);
+			if (btn && typeof onRetry === 'function') {
+				btn.addEventListener('click', onRetry);
+			}
+		};
+		if (translator && typeof translator.translate === 'function') {
+			translator.translate('[[rulesquiz:error.heading]]', function (h) {
+				translator.translate('[[rulesquiz:error.body]]', function (b) {
+					translator.translate('[[rulesquiz:result.try_again]]', function (r) {
+						doRender(
+							h && h !== '[[rulesquiz:error.heading]]' ? h : 'שגיאה',
+							b && b !== '[[rulesquiz:error.body]]' ? b : 'לא ניתן לטעון את החידון. נסו שוב.',
+							r && r !== '[[rulesquiz:result.try_again]]' ? r : 'נסה שוב'
+						);
+					});
+				});
+			});
+		} else {
+			doRender('שגיאה', 'לא ניתן לטעון את החידון. נסו שוב.', 'נסה שוב');
+		}
+	}
+
+	/**
+	 * Fetch the quiz bootstrap data (questions + settings) from the API when
+	 * the inline bootstrap block was missing or empty.
+	 *
+	 * @returns {Promise<{questions: object[], settings: object, gateAck: boolean}>}
+	 */
+	function fetchBootstrap() {
+		const headers = { Accept: 'application/json' };
+		return fetch(API_BASE + '/quiz', {
+			method: 'GET',
+			credentials: 'same-origin',
+			headers: headers,
+		}).then(function (res) {
+			if (!res.ok) {
+				throw new Error('HTTP ' + res.status);
+			}
+			return res.json();
+		}).then(function (json) {
+			// NodeBB write API may wrap payloads as `{ status, response }`;
+			// unwrap defensively.
+			const data = (json && json.response !== undefined) ? json.response : json;
+			return {
+				questions: Array.isArray(data && data.questions) ? data.questions : [],
+				settings: (data && data.settings) || {},
+				gateAck: !!(data && data.gateAck),
+			};
+		});
+	}
+
+	/**
 	 * Wire up the rules-ack screen interactions.
 	 */
 	function setupRulesScreen() {
@@ -94,9 +236,29 @@ define('forum/plugins/rules-quiz', [
 		const btn = document.getElementById('rq-rules-ack-btn');
 		if (!checkbox || !btn) return;
 
+		// Sync disabled state at init (not just on change) — covers the case
+		// where the browser restored a checked state from a bfcache navigation.
+		btn.disabled = !checkbox.checked;
+
 		checkbox.addEventListener('change', function () {
 			btn.disabled = !checkbox.checked;
 		});
+
+		// Ensure clicks anywhere on the rules card that target the checkbox
+		// label toggle it; the `<label>` wrapper already does this natively,
+		// but make the experience explicit and resilient to CSS that might
+		// cover the input with another element.
+		const card = document.querySelector('#rulesquiz-rules .rq-card');
+		if (card) {
+			card.addEventListener('click', function (ev) {
+				const target = ev.target;
+				if (!target) return;
+				// Don't interfere with native checkbox/label behaviour.
+				if (target === checkbox) return;
+				if (target.closest && target.closest('label.rq-checkbox')) return;
+				if (target.closest && target.closest('a,button,input,textarea,select')) return;
+			});
+		}
 
 		btn.addEventListener('click', function () {
 			if (!checkbox.checked) return;
@@ -172,7 +334,18 @@ define('forum/plugins/rules-quiz', [
 	function startQuiz() {
 		state.idx = 0;
 		state.answers = state.answers || {};
+
+		// Defensive: never mount an empty quiz — show a friendly message
+		// instead of a blank prev/next UI. See DEBUG.md §H5.
+		if (!Array.isArray(state.questions) || state.questions.length === 0) {
+			showEmptyState();
+			return;
+		}
+
 		showScreen(SCREEN_QUIZ);
+		// Restore the quiz header in case a previous empty/loading state hid it.
+		const header = document.querySelector('#rulesquiz-quiz .rq-quiz-header');
+		if (header) header.style.display = '';
 		setupQuizScreen();
 
 		const limit = state.settings && state.settings.quiz && state.settings.quiz.timeLimitSec;
@@ -570,26 +743,84 @@ define('forum/plugins/rules-quiz', [
 		}, 1000);
 	}
 
+	/**
+	 * Build the initial client state from a bootstrap payload (either the
+	 * inline JSON block or a fetched API response).
+	 *
+	 * @param {object} boot
+	 */
+	function hydrateState(boot) {
+		state = {
+			questions: Array.isArray(boot.questions) ? boot.questions : [],
+			settings: boot.settings || {},
+			gateAck: !!boot.gateAck,
+			rtl: !!boot.rtl,
+			lang: boot.lang || 'en-GB',
+			idx: 0,
+			answers: {},
+		};
+	}
+
+	/**
+	 * Heuristic: is the bootstrap effectively empty (meaning the template
+	 * filters likely failed to expand)?
+	 *
+	 * @param {object} boot
+	 * @returns {boolean}
+	 */
+	function isBootstrapEmpty(boot) {
+		const settingsEmpty = !boot || !boot.settings || !Object.keys(boot.settings).length;
+		const questionsEmpty = !boot || !Array.isArray(boot.questions) || boot.questions.length === 0;
+		return settingsEmpty || questionsEmpty;
+	}
+
+	/**
+	 * Full init routine. Factored out so we can retry it after an error.
+	 */
+	function runInit() {
+		const boot = readBootstrap();
+		hydrateState(boot);
+
+		// Wire up screens that exist in the DOM up-front — cheap and idempotent.
+		setupRulesScreen();
+		setupIntroScreen();
+		setupQuizScreen();
+
+		if (isBootstrapEmpty(boot)) {
+			// Fall back to the API — this covers NodeBB versions where the
+			// Benchpress `:json` filter isn't available and the inline JSON
+			// ends up as literal `{questions:json}` / `{settings:json}`.
+			showLoadingState();
+			fetchBootstrap().then(function (fetched) {
+				hydrateState({
+					questions: fetched.questions,
+					settings: fetched.settings,
+					gateAck: fetched.gateAck || boot.gateAck,
+					rtl: boot.rtl,
+					lang: boot.lang,
+				});
+				// Re-wire now that state is real (some handlers read settings).
+				setupRulesScreen();
+				setupIntroScreen();
+				setupQuizScreen();
+				decideInitialScreen();
+			}).catch(function (err) {
+				if (window.console) console.error('[rules-quiz] bootstrap fetch failed:', err);
+				showErrorState(function () { runInit(); });
+			});
+			return;
+		}
+
+		decideInitialScreen();
+	}
+
 	return {
 		/**
 		 * Entry point invoked by NodeBB's page-loader when `/quiz` mounts.
 		 */
 		init: function () {
 			if (!document.getElementById('rulesquiz-app')) return;
-			const boot = readBootstrap();
-			state = {
-				questions: Array.isArray(boot.questions) ? boot.questions : [],
-				settings: boot.settings || {},
-				gateAck: !!boot.gateAck,
-				rtl: !!boot.rtl,
-				lang: boot.lang || 'en-GB',
-				idx: 0,
-				answers: {},
-			};
-			setupRulesScreen();
-			setupIntroScreen();
-			setupQuizScreen();
-			decideInitialScreen();
+			runInit();
 		},
 	};
 });
