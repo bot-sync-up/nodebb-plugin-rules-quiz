@@ -620,72 +620,121 @@ define('forum/plugins/rules-quiz', [
 	 * @param {object} resp Server response from `/submit`.
 	 */
 	function renderResult(resp) {
+		// Gate-denied responses from the server (cooldown / locked / daily_limit)
+		// have ok:false and no score/total. Distinguish from a genuine fail.
+		const gated = resp && resp.ok === false;
 		const passed = !!resp.passed;
 		const mode = (state.settings && state.settings.onFail && state.settings.onFail.mode) || 'retry';
+		const score = Number(resp.score || 0);
+		const total = Number(resp.total || 0);
+		const percent = total > 0 ? Math.round((score / total) * 100) : 0;
+		const passPercent = (state.settings && state.settings.quiz && state.settings.quiz.passPercent) || 80;
+
+		const rq = {
+			passed: '[[rulesquiz:result.passed]]',
+			failed: '[[rulesquiz:result.failed]]',
+			continue: '[[rulesquiz:result.continue]]',
+			tryAgain: '[[rulesquiz:result.try_again]]',
+		};
+
+		// Pick main icon + heading + body message.
+		let icon = '🎉';
+		let heading = rq.passed;
+		let msg = '';
 		let showRetry = false;
 		let showCooldown = false;
-		let showLocked = false;
-		let showDailyLimit = false;
-		let cooldownText = '';
 		let cooldownMs = 0;
 
-		if (!passed) {
-			if (resp.reason === 'locked' || mode === 'lock_after_attempts') {
-				showLocked = true;
-			} else if (resp.reason === 'daily_limit' || mode === 'daily_limit') {
-				showDailyLimit = true;
-			} else if (resp.reason === 'cooldown' || mode === 'cooldown') {
+		if (gated) {
+			icon = '⏳';
+			if (resp.reason === 'locked') {
+				icon = '🔒';
+				heading = '[[rulesquiz:result.locked_message]]';
+				msg = '[[rulesquiz:error.locked]]';
+			} else if (resp.reason === 'daily_limit') {
+				icon = '📅';
+				heading = '[[rulesquiz:result.daily_limit_message]]';
+				msg = '[[rulesquiz:error.daily_limit]]';
+			} else if (resp.reason === 'cooldown') {
+				heading = '[[rulesquiz:result.cooldown_remaining]]';
+				msg = '[[rulesquiz:error.cooldown]]';
 				showCooldown = true;
-				cooldownMs = (typeof resp.retryAfterMs === 'number' && resp.retryAfterMs > 0)
-					? resp.retryAfterMs
-					: ((state.settings && state.settings.onFail && state.settings.onFail.cooldownSec) || 0) * 1000;
-				cooldownText = formatCooldown(cooldownMs);
+				cooldownMs = Number(resp.retryAfterMs || 0);
+			} else {
+				heading = rq.failed;
+				msg = '[[rulesquiz:error.network]]';
+				showRetry = true;
+			}
+		} else if (passed) {
+			icon = '🎉';
+			heading = rq.passed;
+			msg = '';
+		} else {
+			icon = '💪';
+			heading = rq.failed;
+			if (total === 0) {
+				msg = 'משהו השתבש בטעינת השאלות. אנא רענן את הדף ונסה שוב.';
+			} else {
+				msg = 'ענית נכון על ' + score + ' מתוך ' + total + ' שאלות. דרוש ' + passPercent + '% או יותר כדי לעבור.';
+			}
+			if (resp.reason === 'locked' || mode === 'lock_after_attempts') {
+				icon = '🔒'; showRetry = false;
+			} else if (mode === 'cooldown') {
+				showCooldown = true;
+				cooldownMs = ((state.settings && state.settings.onFail && state.settings.onFail.cooldownSec) || 0) * 1000;
 			} else {
 				showRetry = true;
 			}
 		}
 
-		const data = {
-			passed: passed,
-			score: resp.score || 0,
-			total: resp.total || 0,
-			perQuestion: Array.isArray(resp.perQuestion) ? resp.perQuestion : [],
-			redirectTo: resp.redirectTo || (state.settings && state.settings.onSuccess && state.settings.onSuccess.redirectTo) || '/',
-			showRetry: showRetry,
-			showCooldown: showCooldown,
-			showLocked: showLocked,
-			showDailyLimit: showDailyLimit,
-			cooldownText: cooldownText,
-		};
+		const stateClass = passed ? 'rq-result-passed' : 'rq-result-failed';
+		const scoreBlock = (!gated && total > 0)
+			? '<div class="rq-result-score">'
+				+ '<strong>' + score + '</strong> / ' + total
+				+ '<span class="rq-result-percent">' + percent + '%</span>'
+				+ '</div>'
+			: '';
+		const cooldownBlock = showCooldown
+			? '<div><span id="rq-cooldown-timer" class="rq-cooldown-counter">' + esc(formatCooldown(cooldownMs)) + '</span></div>'
+			: '';
+		const actionsBlock = (passed)
+			? '<div class="rq-actions"><a class="rq-btn rq-btn--primary" id="rq-continue-btn" href="#">' + rq.continue + '</a></div>'
+			: showRetry
+				? '<div class="rq-actions"><button type="button" id="rq-retry-btn" class="rq-btn rq-btn--primary">' + rq.tryAgain + '</button></div>'
+				: '';
 
-		Benchpress.parse('quiz/result', data, function (html) {
-			translator.translate(html, function (translated) {
-				const container = document.getElementById('rulesquiz-result');
-				if (!container) return;
-				container.innerHTML = translated;
-				showScreen(SCREEN_RESULT);
+		const html = '<div class="rq-card rq-result ' + stateClass + '">'
+			+ '<div class="rq-result-icon">' + icon + '</div>'
+			+ '<h2>' + heading + '</h2>'
+			+ scoreBlock
+			+ (msg ? '<p class="rq-result-msg">' + msg + '</p>' : '')
+			+ cooldownBlock
+			+ actionsBlock
+			+ '</div>';
 
-				if (passed) {
-					setTimeout(function () {
-						window.location.href = data.redirectTo;
-					}, 3000);
-					return;
+		translator.translate(html, function (translated) {
+			const container = document.getElementById('rulesquiz-result');
+			if (!container) return;
+			container.innerHTML = translated;
+			showScreen(SCREEN_RESULT);
+
+			const redirectTo = resp.redirectTo || (state.settings && state.settings.onSuccess && state.settings.onSuccess.redirectTo) || '/';
+			if (passed) {
+				const btn = document.getElementById('rq-continue-btn');
+				if (btn) {
+					btn.setAttribute('href', redirectTo);
+					btn.addEventListener('click', function (e) { e.preventDefault(); window.location.href = redirectTo; });
 				}
-
-				if (showRetry) {
-					const retryBtn = document.getElementById('rq-retry-btn');
-					if (retryBtn) {
-						retryBtn.addEventListener('click', function () {
-							state.answers = {};
-							startQuiz();
-						});
-					}
-				}
-
-				if (showCooldown && cooldownMs > 0) {
-					startCooldownCountdown(cooldownMs);
-				}
-			});
+				setTimeout(function () { window.location.href = redirectTo; }, 3500);
+				return;
+			}
+			if (showRetry) {
+				const retryBtn = document.getElementById('rq-retry-btn');
+				if (retryBtn) retryBtn.addEventListener('click', function () { state.answers = {}; startQuiz(); });
+			}
+			if (showCooldown && cooldownMs > 0) {
+				startCooldownCountdown(cooldownMs);
+			}
 		});
 	}
 

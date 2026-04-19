@@ -1,29 +1,76 @@
 <style>
-/* Critical inline CSS — makes the page usable even if the plugin's LESS
-   bundle isn't loaded yet (e.g. right after activation, before a rebuild). */
-#rulesquiz-app{max-width:720px;margin:1.5rem auto;padding:0 1rem;font-size:16px;line-height:1.55;box-sizing:border-box}
+/* v0.3.0 — full friendly visual refresh. Works even without the LESS bundle. */
+#rulesquiz-app{max-width:780px;margin:2rem auto;padding:0 1rem;font-size:16px;line-height:1.6;box-sizing:border-box;color:#1f2933}
 #rulesquiz-app *,#rulesquiz-app *::before,#rulesquiz-app *::after{box-sizing:border-box}
 #rulesquiz-app .rq-screen{display:none}
 #rulesquiz-app .rq-screen.active{display:block}
-#rulesquiz-app .rq-card{background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:12px;padding:1.5rem;box-shadow:0 4px 18px rgba(0,0,0,.05)}
-#rulesquiz-app .rq-heading{margin:0 0 1rem;font-size:1.6em;font-weight:600}
-#rulesquiz-app .rq-actions{margin-top:1.25rem;display:flex;gap:.5rem;flex-wrap:wrap}
-#rulesquiz-app .rq-btn{display:inline-block;padding:.55rem 1.1rem;border-radius:8px;border:1px solid rgba(0,0,0,.15);background:#fff;cursor:pointer;font:inherit;color:inherit}
-#rulesquiz-app .rq-btn:hover{background:rgba(0,0,0,.04)}
-#rulesquiz-app .rq-btn--primary{background:#2d6cdf;color:#fff;border-color:#2058c1}
-#rulesquiz-app .rq-btn--primary:hover{background:#2058c1}
-#rulesquiz-app .rq-btn[disabled]{opacity:.5;cursor:not-allowed}
-#rulesquiz-app .rq-checkbox{display:flex;align-items:center;gap:.5rem;margin:1rem 0}
-#rulesquiz-app .rq-rules-body,#rulesquiz-app .rq-intro-body{margin:1rem 0;padding:1rem;background:rgba(0,0,0,.03);border-radius:8px;max-height:50vh;overflow:auto}
+#rulesquiz-app .rq-card{background:#fff;border:1px solid #e4e7eb;border-radius:18px;padding:2rem 2.25rem;box-shadow:0 10px 40px rgba(17,24,39,.06),0 2px 6px rgba(17,24,39,.03)}
+@media (max-width:600px){#rulesquiz-app .rq-card{padding:1.5rem 1.25rem;border-radius:14px}}
+#rulesquiz-app .rq-heading{margin:0 0 1rem;font-size:1.7em;font-weight:700;letter-spacing:-.01em;line-height:1.3;display:flex;align-items:center;gap:.6rem}
+#rulesquiz-app #rulesquiz-rules .rq-heading::before{content:"📖";font-size:1em}
+#rulesquiz-app #rulesquiz-intro .rq-heading::before{content:"👋";font-size:1em}
+#rulesquiz-app #rulesquiz-quiz .rq-heading::before{content:"❓";font-size:1em}
+#rulesquiz-app .rq-actions{margin-top:1.5rem;display:flex;gap:.6rem;flex-wrap:wrap}
+#rulesquiz-app .rq-btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.8rem 1.5rem;border-radius:10px;border:1px solid transparent;background:#fff;cursor:pointer;font:inherit;font-weight:600;color:#1f2933;transition:all .15s ease;min-height:46px}
+#rulesquiz-app .rq-btn:hover:not([disabled]){transform:translateY(-1px)}
+#rulesquiz-app .rq-btn--primary{background:linear-gradient(135deg,#4f7cff,#3b5fe2);color:#fff;border-color:#3b5fe2;box-shadow:0 2px 8px rgba(79,124,255,.35)}
+#rulesquiz-app .rq-btn--primary:hover:not([disabled]){background:linear-gradient(135deg,#3b5fe2,#2d4ac0);box-shadow:0 4px 14px rgba(79,124,255,.45)}
+#rulesquiz-app .rq-btn--ghost{background:#fff;color:#475569;border-color:#cbd5e1}
+#rulesquiz-app .rq-btn--ghost:hover:not([disabled]){background:#f1f5f9;border-color:#94a3b8}
+#rulesquiz-app .rq-btn[disabled]{opacity:.45;cursor:not-allowed;transform:none!important;box-shadow:none}
+#rulesquiz-app .rq-checkbox{display:flex;align-items:center;gap:.7rem;margin:1.25rem 0;padding:.85rem 1.1rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;font-weight:500;transition:all .15s ease}
+#rulesquiz-app .rq-checkbox:hover{background:#f1f5f9;border-color:#cbd5e1}
+#rulesquiz-app .rq-checkbox input[type="checkbox"]{width:1.25rem;height:1.25rem;margin:0;cursor:pointer;accent-color:#4f7cff}
+#rulesquiz-app .rq-rules-body,#rulesquiz-app .rq-intro-body{margin:1rem 0 1.25rem;padding:1.25rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;max-height:55vh;overflow:auto;line-height:1.65}
 #rulesquiz-app .rq-rules-body--plain,#rulesquiz-app .rq-intro-body--plain{white-space:pre-wrap;font-family:inherit}
-#rulesquiz-app .rq-rules-body h1,#rulesquiz-app .rq-rules-body h2,#rulesquiz-app .rq-rules-body h3{margin-top:1em}
-#rulesquiz-app .rq-rules-body ul,#rulesquiz-app .rq-rules-body ol{padding-inline-start:1.4em}
-#rulesquiz-app .rq-progress{height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden;margin:.75rem 0 1rem}
-#rulesquiz-app .rq-progress-bar{height:100%;background:#2d6cdf;width:0;transition:width .3s}
-#rulesquiz-app .rq-quiz-footer{display:flex;gap:.5rem;margin-top:1.25rem;flex-wrap:wrap}
+#rulesquiz-app .rq-rules-body h1,#rulesquiz-app .rq-rules-body h2,#rulesquiz-app .rq-rules-body h3{margin-top:1.2em;font-weight:700}
+#rulesquiz-app .rq-rules-body h2{font-size:1.3em;color:#1e293b}
+#rulesquiz-app .rq-rules-body ul,#rulesquiz-app .rq-rules-body ol{padding-inline-start:1.6em;margin:.5em 0}
+#rulesquiz-app .rq-rules-body li{margin:.35em 0}
+#rulesquiz-app .rq-rules-body a{color:#4f7cff;text-decoration:underline}
+#rulesquiz-app .rq-rules-link{margin:1rem 0 0;font-size:.92em;color:#64748b}
+#rulesquiz-app .rq-rules-link a{color:#4f7cff;text-decoration:underline;font-weight:500}
+#rulesquiz-app .rq-quiz-meta{display:flex;justify-content:space-between;align-items:center;margin:.5rem 0 1rem;font-size:.95em;color:#64748b}
+#rulesquiz-app .rq-progress-text{font-weight:600;color:#334155}
+#rulesquiz-app .rq-progress{height:10px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin:0 0 1.5rem}
+#rulesquiz-app .rq-progress-bar{height:100%;background:linear-gradient(90deg,#4f7cff,#7c9aff);width:0;transition:width .4s cubic-bezier(.22,1,.36,1);border-radius:999px}
+#rulesquiz-app .rq-question{margin:1.25rem 0}
+#rulesquiz-app .rq-question-title{font-size:1.3em;font-weight:600;margin:0 0 1rem;line-height:1.4;color:#0f172a}
+#rulesquiz-app .rq-question-body{margin:.5rem 0 1rem;color:#475569;line-height:1.6}
+#rulesquiz-app .rq-question-image{max-width:100%;border-radius:10px;margin:.75rem 0;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+#rulesquiz-app .rq-question-rulelink{margin:.75rem 0 1rem;font-size:.9em;color:#64748b}
+#rulesquiz-app .rq-question-rulelink a{color:#4f7cff;text-decoration:underline}
+#rulesquiz-app .rq-options{display:flex;flex-direction:column;gap:.75rem;margin-top:1.25rem}
+#rulesquiz-app .rq-option{display:flex;align-items:center;gap:.85rem;padding:1rem 1.2rem;border:2px solid #e2e8f0;border-radius:12px;cursor:pointer;transition:all .15s ease;background:#fff}
+#rulesquiz-app .rq-option:hover{background:#f8fafc;border-color:#94a3b8}
+#rulesquiz-app .rq-option input[type="radio"],#rulesquiz-app .rq-option input[type="checkbox"]{margin:0;flex-shrink:0;width:1.2rem;height:1.2rem;cursor:pointer;accent-color:#4f7cff}
+#rulesquiz-app .rq-option:has(input:checked){border-color:#4f7cff;background:#eff4ff;box-shadow:0 2px 8px rgba(79,124,255,.2)}
+#rulesquiz-app .rq-option:has(input:checked) .rq-option-text{color:#1e40af;font-weight:600}
+#rulesquiz-app .rq-option-text{flex:1;line-height:1.5;color:#334155}
+#rulesquiz-app .rq-input{width:100%;padding:.85rem 1rem;border:2px solid #e2e8f0;border-radius:10px;font:inherit;transition:border-color .15s ease}
+#rulesquiz-app .rq-input:focus{outline:none;border-color:#4f7cff;box-shadow:0 0 0 3px rgba(79,124,255,.15)}
+#rulesquiz-app .rq-timer{font-variant-numeric:tabular-nums;font-weight:700;color:#0f172a;background:#f1f5f9;padding:.2rem .6rem;border-radius:6px}
+#rulesquiz-app .rq-empty,#rulesquiz-app .rq-loading{text-align:center;padding:3rem 1rem;color:#64748b}
+#rulesquiz-app .rq-empty h2,#rulesquiz-app .rq-loading h2{color:#334155;margin-bottom:.5rem}
+#rulesquiz-app .rq-quiz-footer{display:flex;gap:.6rem;margin-top:1.5rem;justify-content:space-between}
 #rulesquiz-app[dir="rtl"] .rq-actions,#rulesquiz-app[dir="rtl"] .rq-quiz-footer{flex-direction:row-reverse}
-#rulesquiz-app .rq-empty{text-align:center;padding:2rem;color:#666}
-#rulesquiz-app .rq-loading{text-align:center;padding:2rem;color:#888}
+#rulesquiz-app[dir="rtl"] .rq-option{text-align:right}
+#rulesquiz-app[dir="rtl"] .rq-rules-body ul,#rulesquiz-app[dir="rtl"] .rq-rules-body ol{padding-inline-start:0;padding-inline-end:1.6em}
+/* Result screen */
+#rulesquiz-app .rq-result{text-align:center;padding:1rem 0}
+#rulesquiz-app .rq-result-icon{font-size:4.5rem;line-height:1;margin:.5rem 0 1rem;display:inline-block;animation:rq-pop .5s ease}
+@keyframes rq-pop{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+#rulesquiz-app .rq-result h2{font-size:1.9em;margin:0 0 .5rem;font-weight:700}
+#rulesquiz-app .rq-result-passed h2{color:#16a34a}
+#rulesquiz-app .rq-result-failed h2{color:#dc2626}
+#rulesquiz-app .rq-result-score{font-size:1.25em;color:#475569;margin:.75rem 0 1.5rem;font-weight:500}
+#rulesquiz-app .rq-result-score strong{color:#0f172a;font-size:1.15em}
+#rulesquiz-app .rq-result-percent{display:inline-block;padding:.3rem .8rem;border-radius:999px;font-size:.88em;margin-inline-start:.5rem;font-weight:700}
+#rulesquiz-app .rq-result-passed .rq-result-percent{background:#dcfce7;color:#166534}
+#rulesquiz-app .rq-result-failed .rq-result-percent{background:#fee2e2;color:#991b1b}
+#rulesquiz-app .rq-result-msg{max-width:500px;margin:1rem auto 1.75rem;color:#475569;line-height:1.65}
+#rulesquiz-app .rq-result .rq-actions{justify-content:center}
+#rulesquiz-app .rq-cooldown-counter{font-variant-numeric:tabular-nums;font-weight:700;color:#dc2626;background:#fee2e2;padding:.4rem .9rem;border-radius:8px;display:inline-block;margin-top:.5rem}
 </style>
 
 <div id="rulesquiz-app" class="rulesquiz-container" dir="{{{ if rtl }}}rtl{{{ else }}}ltr{{{ end }}}" lang="{lang}">
