@@ -670,12 +670,13 @@ define('forum/plugins/rules-quiz', [
 			heading = rq.passed;
 			msg = '';
 		} else {
-			icon = '💪';
+			icon = '🙁';
 			heading = rq.failed;
 			if (total === 0) {
+				icon = '⚠️';
 				msg = 'משהו השתבש בטעינת השאלות. אנא רענן את הדף ונסה שוב.';
 			} else {
-				msg = 'ענית נכון על ' + score + ' מתוך ' + total + ' שאלות. דרוש ' + passPercent + '% או יותר כדי לעבור.';
+				msg = 'ענית נכון על ' + score + ' מתוך ' + total + ' שאלות. דרוש ' + passPercent + '% כדי לעבור.';
 			}
 			if (resp.reason === 'locked' || mode === 'lock_after_attempts') {
 				icon = '🔒'; showRetry = false;
@@ -685,6 +686,39 @@ define('forum/plugins/rules-quiz', [
 			} else {
 				showRetry = true;
 			}
+		}
+
+		// Build per-question breakdown HTML (what was right / wrong / why).
+		const perQuestion = Array.isArray(resp.perQuestion) ? resp.perQuestion : [];
+		let breakdownHtml = '';
+		if (perQuestion.length > 0) {
+			const rows = perQuestion.map(function (pq, idx) {
+				const statusIcon = pq.correct ? '✅' : '❌';
+				const statusClass = pq.correct ? 'rq-pq-correct' : 'rq-pq-wrong';
+				const num = idx + 1;
+				const title = esc(pq.title || ('שאלה ' + num));
+				const given = pq.given ? esc(pq.given) : '<em style="opacity:.6">לא נענתה</em>';
+				const correctAnswer = pq.correctAnswer ? esc(pq.correctAnswer) : '';
+				const explanation = pq.explanation ? esc(pq.explanation) : '';
+				const ruleLink = pq.ruleLinkUrl
+					? ' <a href="' + esc(pq.ruleLinkUrl) + '" target="_blank" rel="noopener" class="rq-pq-rulelink">🔗 לחוק</a>'
+					: '';
+
+				return '<details class="rq-pq ' + statusClass + '"' + (pq.correct ? '' : ' open') + '>'
+					+ '<summary><span class="rq-pq-icon">' + statusIcon + '</span>'
+					+ '<span class="rq-pq-num">' + num + '.</span>'
+					+ '<span class="rq-pq-title">' + title + '</span></summary>'
+					+ '<div class="rq-pq-body">'
+					+   '<div class="rq-pq-row"><span class="rq-pq-label">התשובה שלך:</span> <span class="rq-pq-value">' + given + '</span></div>'
+					+   (!pq.correct && correctAnswer ? '<div class="rq-pq-row"><span class="rq-pq-label">התשובה הנכונה:</span> <span class="rq-pq-value rq-pq-correct-text">' + correctAnswer + '</span></div>' : '')
+					+   (explanation ? '<div class="rq-pq-explain">💡 ' + explanation + ruleLink + '</div>' : ruleLink ? '<div class="rq-pq-explain">' + ruleLink + '</div>' : '')
+					+ '</div>'
+					+ '</details>';
+			}).join('');
+			breakdownHtml = '<div class="rq-pq-list">'
+				+ '<h3 class="rq-pq-heading">פירוט התשובות</h3>'
+				+ rows
+				+ '</div>';
 		}
 
 		const stateClass = passed ? 'rq-result-passed' : 'rq-result-failed';
@@ -710,6 +744,7 @@ define('forum/plugins/rules-quiz', [
 			+ (msg ? '<p class="rq-result-msg">' + msg + '</p>' : '')
 			+ cooldownBlock
 			+ actionsBlock
+			+ breakdownHtml
 			+ '</div>';
 
 		translator.translate(html, function (translated) {
