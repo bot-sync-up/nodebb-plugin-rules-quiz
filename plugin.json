@@ -30,8 +30,7 @@
     { "hook": "action:user.create",         "method": "onUserCreate" },
     { "hook": "action:user.loggedIn",       "method": "onUserLoggedIn" },
     { "hook": "response:router.page",       "method": "gate" },
-    { "hook": "filter:post.create",         "method": "guardPost" },
-    { "hook": "filter:topic.create",        "method": "guardPost" },
-    { "hook": "filter:topic.reply",         "method": "guardPost" }
+    { "hook": "filter:topic.reply",         "method": "guardPost" },
+    { "hook": "filter:topic.create",        "method": "guardTopic" }
   ]
 }
