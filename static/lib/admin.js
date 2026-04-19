@@ -13,13 +13,49 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 	// helpers
 	// ---------------------------------------------------------------
 
+	function getCsrfToken() {
+		var token = '';
+		try {
+			if (window.config && window.config.csrf_token) {
+				token = window.config.csrf_token;
+			}
+		} catch (e) { /* ignore */ }
+		if (!token) {
+			try {
+				var meta = $('meta[name="csrf-token"]').attr('content');
+				if (meta) { token = meta; }
+			} catch (e) { /* ignore */ }
+		}
+		if (!token) {
+			try {
+				if (window.app && window.app.user && window.app.user.csrf_token) {
+					token = window.app.user.csrf_token;
+				}
+			} catch (e) { /* ignore */ }
+		}
+		return token || '';
+	}
+
 	function csrfHeaders() {
-		var token = (window.config && window.config.csrf_token) || $('meta[name="csrf-token"]').attr('content') || '';
+		var token = getCsrfToken();
 		return token ? { 'x-csrf-token': token } : {};
+	}
+
+	function unwrap(resp) {
+		if (resp && typeof resp === 'object' && Object.prototype.hasOwnProperty.call(resp, 'response')) {
+			return resp.response;
+		}
+		return resp;
 	}
 
 	function apiFetch(method, path, body, opts) {
 		opts = opts || {};
+		var mutating = method && method.toUpperCase() !== 'GET' && method.toUpperCase() !== 'HEAD';
+		var token = getCsrfToken();
+		if (mutating && !token && !opts.skipCsrfCheck) {
+			alerts.error('[[rulesquiz:admin.error.csrf]]');
+			return Promise.reject(new Error('Missing CSRF token'));
+		}
 		var headers = Object.assign({ 'Accept': 'application/json' }, csrfHeaders(), opts.headers || {});
 		var init = { method: method, credentials: 'same-origin', headers: headers };
 		if (body !== undefined && body !== null) {
@@ -33,9 +69,21 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		return fetch(path, init).then(function (res) {
 			if (!res.ok) {
 				return res.text().then(function (txt) {
-					var msg;
-					try { msg = JSON.parse(txt).status && JSON.parse(txt).status.message; } catch (e) { msg = txt; }
-					throw new Error(msg || ('HTTP ' + res.status));
+					var displayMsg = txt;
+					try {
+						var parsed = JSON.parse(txt);
+						if (parsed && parsed.status && parsed.status.message) {
+							displayMsg = parsed.status.message;
+						} else if (parsed && parsed.error) {
+							displayMsg = parsed.error;
+						} else if (parsed && parsed.message) {
+							displayMsg = parsed.message;
+						}
+					} catch (e) { /* leave txt */ }
+					var err = new Error(displayMsg || ('HTTP ' + res.status));
+					err.status = res.status;
+					err.rawBody = txt;
+					throw err;
 				});
 			}
 			if (res.status === 204) { return null; }
@@ -100,6 +148,55 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		return val ? val : null;
 	}
 
+	function flashSaved($scope) {
+		try {
+			var $fields = ($scope || $('.rules-quiz-settings')).find('[data-field]');
+			$fields.addClass('rq-just-saved');
+			setTimeout(function () { $fields.removeClass('rq-just-saved'); }, 900);
+		} catch (e) { /* ignore */ }
+	}
+
+	// ---------------------------------------------------------------
+	// plugin status panel
+	// ---------------------------------------------------------------
+
+	function updateStatusPanel() {
+		var s = state.settings || {};
+		var qCount = Array.isArray(state.questions) ? state.questions.length : 0;
+		var enabled = !!s.enabled;
+		var rulesUrl = (s.rules && s.rules.rulesUrl) ? s.rules.rulesUrl : '';
+		var hasRules = !!rulesUrl;
+
+		var $panel = $('#rq-status-panel');
+		if (!$panel.length) { return; }
+
+		$panel.find('[data-status="enabled"]')
+			.removeClass('rq-badge-ok rq-badge-warn rq-badge-err')
+			.addClass(enabled ? 'rq-badge-ok' : 'rq-badge-warn')
+			.text(enabled ? '[[rulesquiz:admin.status.on]]' : '[[rulesquiz:admin.status.off]]');
+
+		$panel.find('[data-status="questions"]')
+			.removeClass('rq-badge-ok rq-badge-warn rq-badge-err')
+			.addClass(qCount > 0 ? 'rq-badge-ok' : 'rq-badge-err')
+			.text(String(qCount));
+
+		$panel.find('[data-status="rulesUrl"]')
+			.removeClass('rq-badge-ok rq-badge-warn rq-badge-err')
+			.addClass(hasRules ? 'rq-badge-ok' : 'rq-badge-warn')
+			.text(hasRules ? rulesUrl : '[[rulesquiz:admin.status.missing]]');
+
+		// redis/store status — best-effort. If _meta from settings includes store, use it.
+		var storeOk = !!(s && s._meta && s._meta.storeOk);
+		// fallback: if we got a settings object at all, assume store is reachable.
+		if (!s._meta && state.settings) { storeOk = true; }
+		$panel.find('[data-status="store"]')
+			.removeClass('rq-badge-ok rq-badge-warn rq-badge-err')
+			.addClass(storeOk ? 'rq-badge-ok' : 'rq-badge-warn')
+			.text(storeOk ? '[[rulesquiz:admin.status.ok]]' : '[[rulesquiz:admin.status.unknown]]');
+
+		translator.translate($panel.html(), function (t) { $panel.html(t); });
+	}
+
 	// ---------------------------------------------------------------
 	// settings tab
 	// ---------------------------------------------------------------
@@ -123,6 +220,7 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 				$el.val(val === null || val === undefined ? '' : val);
 			}
 		});
+		updateStatusPanel();
 	}
 
 	function collectSettingsForm() {
@@ -154,19 +252,80 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 
 	function loadSettings() {
 		return apiFetch('GET', API_BASE + '/settings').then(function (resp) {
-			var settings = resp && (resp.response || resp.settings || resp);
+			var settings = unwrap(resp);
+			if (settings && typeof settings === 'object' && settings.settings && typeof settings.settings === 'object') {
+				settings = settings.settings;
+			}
 			populateSettingsForm(settings || {});
 		}).catch(function (err) {
-			alerts.error('[[rulesquiz:admin.error.load_settings]]: ' + err.message);
+			alerts.error('[[rulesquiz:admin.error.load_settings]]: ' + (err && err.message ? err.message : err));
 		});
 	}
 
 	function saveSettings() {
 		var payload = collectSettingsForm();
-		return apiFetch('PUT', API_BASE + '/settings', payload).then(function () {
+		console.log('[rules-quiz/acp] PUT settings', payload);
+		var $btn = $('#rq-save-settings');
+		var origHtml = $btn.html();
+		$btn.prop('disabled', true);
+		$btn.html('<i class="fa fa-spinner fa-spin"></i> [[rulesquiz:admin.saving]]');
+		translator.translate($btn.html(), function (t) { $btn.html(t); });
+
+		return apiFetch('PUT', API_BASE + '/settings', payload).then(function (res) {
+			console.log('[rules-quiz/acp] PUT response', res);
+			var body = unwrap(res);
+			if (body && typeof body === 'object' && body.settings && typeof body.settings === 'object') {
+				body = body.settings;
+			}
+			if (body && typeof body === 'object') {
+				populateSettingsForm(body);
+			}
 			alerts.success('[[rulesquiz:admin.saved]]');
+			flashSaved($('.rules-quiz-settings'));
 		}).catch(function (err) {
-			alerts.error('[[rulesquiz:admin.error.save_settings]]: ' + err.message);
+			console.error('[rules-quiz/acp] PUT settings failed', err);
+			var msg = err && err.message ? err.message : String(err);
+			alerts.error('[[rulesquiz:admin.error.save_settings]]: ' + msg);
+		}).then(function () {
+			$btn.prop('disabled', false);
+			$btn.html(origHtml);
+		});
+	}
+
+	function testSaveRoundtrip() {
+		var payload = { enabled: true };
+		console.log('[rules-quiz/acp] TEST PUT settings', payload);
+		var $btn = $('#rq-test-save');
+		var origHtml = $btn.html();
+		$btn.prop('disabled', true);
+		$btn.html('<i class="fa fa-spinner fa-spin"></i> [[rulesquiz:admin.saving]]');
+		translator.translate($btn.html(), function (t) { $btn.html(t); });
+
+		return apiFetch('PUT', API_BASE + '/settings', payload).then(function (res) {
+			console.log('[rules-quiz/acp] TEST PUT response', res);
+			return apiFetch('GET', API_BASE + '/settings');
+		}).then(function (res) {
+			console.log('[rules-quiz/acp] TEST GET response', res);
+			var body = unwrap(res);
+			if (body && typeof body === 'object' && body.settings && typeof body.settings === 'object') {
+				body = body.settings;
+			}
+			var preview;
+			try {
+				preview = JSON.stringify(body, null, 2);
+			} catch (e) {
+				preview = String(body);
+			}
+			if (preview && preview.length > 600) { preview = preview.slice(0, 600) + ' ...'; }
+			alerts.success('[[rulesquiz:admin.test_save_ok]]\n' + preview);
+			if (body && typeof body === 'object') { populateSettingsForm(body); }
+		}).catch(function (err) {
+			console.error('[rules-quiz/acp] TEST save failed', err);
+			var msg = err && err.message ? err.message : String(err);
+			alerts.error('[[rulesquiz:admin.test_save_err]]: ' + msg);
+		}).then(function () {
+			$btn.prop('disabled', false);
+			$btn.html(origHtml);
 		});
 	}
 
@@ -179,6 +338,8 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		if (!state.questions || !state.questions.length) {
 			$tbody.html('<tr><td colspan="5" class="text-center text-muted">[[rulesquiz:admin.empty_questions]]</td></tr>');
 			translator.translate($tbody.html(), function (translated) { $tbody.html(translated); });
+			$('.rq-question-count').text('0');
+			updateStatusPanel();
 			return;
 		}
 		var rows = state.questions.map(function (q) {
@@ -199,16 +360,24 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		}).join('');
 		$tbody.html(rows);
 		$('.rq-question-count').text(state.questions.length);
+		updateStatusPanel();
 	}
 
 	function loadQuestions() {
 		return apiFetch('GET', API_BASE + '/questions').then(function (resp) {
-			var data = resp && (resp.response || resp);
-			state.questions = (data && (data.questions || data)) || [];
-			if (!Array.isArray(state.questions)) { state.questions = []; }
+			var data = unwrap(resp);
+			var list = [];
+			if (Array.isArray(data)) {
+				list = data;
+			} else if (data && Array.isArray(data.questions)) {
+				list = data.questions;
+			} else if (data && typeof data === 'object') {
+				list = [];
+			}
+			state.questions = list || [];
 			renderQuestionsTable();
 		}).catch(function (err) {
-			alerts.error('[[rulesquiz:admin.error.load_questions]]: ' + err.message);
+			alerts.error('[[rulesquiz:admin.error.load_questions]]: ' + (err && err.message ? err.message : err));
 		});
 	}
 
@@ -354,25 +523,43 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 			sort: Number($('#rq-q-sort').val()) || 100,
 		};
 		var qid = state.editingQid;
+		console.log('[rules-quiz/acp] ' + (qid ? 'PUT' : 'POST') + ' question', payload, 'qid=', qid);
+
+		var $btn = $('#rq-q-save');
+		var origHtml = $btn.html();
+		$btn.prop('disabled', true);
+		$btn.html('<i class="fa fa-spinner fa-spin"></i> [[rulesquiz:admin.saving]]');
+		translator.translate($btn.html(), function (t) { $btn.html(t); });
+
 		var req = qid
 			? apiFetch('PUT', API_BASE + '/questions/' + encodeURIComponent(qid), payload)
 			: apiFetch('POST', API_BASE + '/questions', payload);
-		return req.then(function () {
+		return req.then(function (res) {
+			console.log('[rules-quiz/acp] question save response', res);
 			alerts.success('[[rulesquiz:admin.saved]]');
 			closeQuestionModal();
-			loadQuestions();
+			return loadQuestions();
 		}).catch(function (err) {
-			alerts.error('[[rulesquiz:admin.error.save_question]]: ' + err.message);
+			console.error('[rules-quiz/acp] question save failed', err);
+			var msg = err && err.message ? err.message : String(err);
+			alerts.error('[[rulesquiz:admin.error.save_question]]: ' + msg);
+		}).then(function () {
+			$btn.prop('disabled', false);
+			$btn.html(origHtml);
 		});
 	}
 
 	function deleteQuestion(qid) {
 		if (!window.confirm('[[rulesquiz:admin.confirm_delete]]')) { return; }
-		apiFetch('DELETE', API_BASE + '/questions/' + encodeURIComponent(qid)).then(function () {
+		console.log('[rules-quiz/acp] DELETE question', qid);
+		apiFetch('DELETE', API_BASE + '/questions/' + encodeURIComponent(qid)).then(function (res) {
+			console.log('[rules-quiz/acp] DELETE response', res);
 			alerts.success('[[rulesquiz:admin.deleted]]');
-			loadQuestions();
+			return loadQuestions();
 		}).catch(function (err) {
-			alerts.error('[[rulesquiz:admin.error.delete_question]]: ' + err.message);
+			console.error('[rules-quiz/acp] DELETE failed', err);
+			var msg = err && err.message ? err.message : String(err);
+			alerts.error('[[rulesquiz:admin.error.delete_question]]: ' + msg);
 		});
 	}
 
@@ -411,26 +598,36 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 					alerts.error('[[rulesquiz:admin.error.bad_json]]: ' + e.message);
 					return;
 				}
+				console.log('[rules-quiz/acp] POST import json', { count: Array.isArray(parsed) ? parsed.length : 'n/a' });
 				apiFetch('POST', API_BASE + '/questions/import?format=json', { questions: parsed }).then(function (resp) {
-					var added = (resp && resp.response && resp.response.added) || (resp && resp.added) || 0;
+					console.log('[rules-quiz/acp] import response', resp);
+					var body = unwrap(resp) || {};
+					var added = body.added || 0;
 					alerts.success('[[rulesquiz:admin.imported]] (' + added + ')');
 					closeImportModal();
-					loadQuestions();
+					return loadQuestions();
 				}).catch(function (err) {
-					alerts.error('[[rulesquiz:admin.error.import]]: ' + err.message);
+					console.error('[rules-quiz/acp] import failed', err);
+					var msg = err && err.message ? err.message : String(err);
+					alerts.error('[[rulesquiz:admin.error.import]]: ' + msg);
 				});
 			};
 			fr.readAsText(file);
 		} else {
 			var fd = new FormData();
 			fd.append('file', file);
+			console.log('[rules-quiz/acp] POST import csv', file.name);
 			apiFetch('POST', API_BASE + '/questions/import?format=csv', fd).then(function (resp) {
-				var added = (resp && resp.response && resp.response.added) || (resp && resp.added) || 0;
+				console.log('[rules-quiz/acp] import response', resp);
+				var body = unwrap(resp) || {};
+				var added = body.added || 0;
 				alerts.success('[[rulesquiz:admin.imported]] (' + added + ')');
 				closeImportModal();
-				loadQuestions();
+				return loadQuestions();
 			}).catch(function (err) {
-				alerts.error('[[rulesquiz:admin.error.import]]: ' + err.message);
+				console.error('[rules-quiz/acp] import failed', err);
+				var msg = err && err.message ? err.message : String(err);
+				alerts.error('[[rulesquiz:admin.error.import]]: ' + msg);
 			});
 		}
 	}
@@ -510,14 +707,14 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		var from = new Date(Date.now() - 30 * 24 * 3600 * 1000);
 		var qs = '?from=' + encodeURIComponent(from.toISOString()) + '&to=' + encodeURIComponent(to.toISOString());
 		return apiFetch('GET', API_BASE + '/stats' + qs).then(function (resp) {
-			var data = (resp && (resp.response || resp)) || {};
+			var data = unwrap(resp) || {};
 			var totals = data.totals || { passed: 0, failed: 0 };
 			$('#rq-stat-passed').text(totals.passed || 0);
 			$('#rq-stat-failed').text(totals.failed || 0);
 			renderHardest(data.hardestQuestions || []);
 			renderDailyChart(data.daily || []);
 		}).catch(function (err) {
-			alerts.error('[[rulesquiz:admin.error.load_stats]]: ' + err.message);
+			alerts.error('[[rulesquiz:admin.error.load_stats]]: ' + (err && err.message ? err.message : err));
 		});
 	}
 
@@ -528,7 +725,7 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 			return;
 		}
 		apiFetch('GET', API_BASE + '/users/' + encodeURIComponent(uid) + '/attempts').then(function (resp) {
-			var data = (resp && (resp.response || resp)) || {};
+			var data = unwrap(resp) || {};
 			var attempts = data.attempts || data || [];
 			if (!Array.isArray(attempts)) { attempts = []; }
 			var $tb = $('#rq-attempts-tbody');
@@ -552,7 +749,7 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 			}).join(''));
 			translator.translate($tb.html(), function (t) { $tb.html(t); });
 		}).catch(function (err) {
-			alerts.error('[[rulesquiz:admin.error.load_attempts]]: ' + err.message);
+			alerts.error('[[rulesquiz:admin.error.load_attempts]]: ' + (err && err.message ? err.message : err));
 		});
 	}
 
@@ -564,6 +761,9 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		// settings save
 		$(document).off('click.rqsave').on('click.rqsave', '#rq-save-settings', function () {
 			saveSettings();
+		});
+		$(document).off('click.rqtestsave').on('click.rqtestsave', '#rq-test-save', function () {
+			testSaveRoundtrip();
 		});
 
 		// questions

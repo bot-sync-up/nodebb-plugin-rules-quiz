@@ -8,6 +8,26 @@
 		</div>
 	</div>
 
+	<div class="rq-status-panel" id="rq-status-panel">
+		<span class="rq-status-title">[[rulesquiz:admin.status.title]]:</span>
+		<span class="rq-status-item">
+			<span class="rq-status-label">[[rulesquiz:admin.status.enabled]]</span>
+			<span class="rq-status-badge" data-status="enabled">--</span>
+		</span>
+		<span class="rq-status-item">
+			<span class="rq-status-label">[[rulesquiz:admin.status.questions]]</span>
+			<span class="rq-status-badge" data-status="questions">--</span>
+		</span>
+		<span class="rq-status-item">
+			<span class="rq-status-label">[[rulesquiz:admin.status.rulesUrl]]</span>
+			<span class="rq-status-badge" data-status="rulesUrl">--</span>
+		</span>
+		<span class="rq-status-item">
+			<span class="rq-status-label">[[rulesquiz:admin.status.store]]</span>
+			<span class="rq-status-badge" data-status="store">--</span>
+		</span>
+	</div>
+
 	<ul class="nav nav-tabs rq-tabs" role="tablist">
 		<li class="nav-item" role="presentation">
 			<a class="nav-link active" data-toggle="tab" data-bs-toggle="tab" href="#rq-tab-settings" role="tab">
@@ -216,6 +236,9 @@
 				</div>
 
 				<div class="rq-actions">
+					<button type="button" class="btn btn-outline-secondary btn-default rq-test-save-btn" id="rq-test-save" title="[[rulesquiz:admin.test_save_help]]">
+						<i class="fa fa-flask"></i> [[rulesquiz:admin.test_save]]
+					</button>
 					<button type="button" class="btn btn-primary" id="rq-save-settings">
 						<i class="fa fa-save"></i> [[rulesquiz:admin.save]]
 					</button>
