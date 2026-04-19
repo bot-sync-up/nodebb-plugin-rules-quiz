@@ -197,18 +197,33 @@ async function guardKind(kind, data) {
   const already = Number((state && state[countField]) || 0);
   if (already >= limit) return data; // past the gate window — free to post
 
-  // Token handshake via session (set by /submit on a passing mode-aware quiz).
-  const req = (data && (data.req || (data.data && data.data.req))) || null;
-  const session = req && req.session;
-  const tokenField = kind === 'topic' ? 'rqTopicToken' : 'rqPostToken';
-  const token = session && session[tokenField];
+  // Token handshake via the user-state hash (DB-backed) — socket.io hook
+  // contexts don't carry req.session, so storing the token only in the
+  // session would make the gate impossible to pass. Session is kept as a
+  // belt-and-braces backup.
   const now = Date.now();
-  if (token && token.exp && token.exp > now) {
-    // Consume the token (single-use) + increment the kind counter.
-    try { if (session) delete session[tokenField]; } catch (_) { /* noop */ }
+  const dbField = kind === 'topic' ? 'topicTokenExp' : 'postTokenExp';
+  const dbExp = Number((state && state[dbField]) || 0);
+  let hasToken = dbExp > now;
+
+  if (!hasToken) {
+    const req = (data && (data.req || (data.data && data.data.req))) || null;
+    const session = req && req.session;
+    const tokenField = kind === 'topic' ? 'rqTopicToken' : 'rqPostToken';
+    const token = session && session[tokenField];
+    if (token && token.exp && token.exp > now) {
+      hasToken = true;
+      try { if (session) delete session[tokenField]; } catch (_) { /* noop */ }
+    }
+  }
+
+  if (hasToken) {
+    // Consume (single-use) + increment the kind counter.
     const nextState = {};
     nextState[countField] = already + 1;
+    nextState[dbField] = 0;
     await db.setUserState(uid, nextState);
+    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' count=' + (already + 1) + '/' + limit);
     return data;
   }
 
@@ -217,6 +232,7 @@ async function guardKind(kind, data) {
   // gate-redirect.js script can reliably detect it in the toast text.
   const code = kind === 'topic' ? 'rules-quiz:topic-gate' : 'rules-quiz:post-gate';
   const key = kind === 'topic' ? 'error.need_topic_quiz' : 'error.need_post_quiz';
+  winston.info('[rules-quiz] ' + kind + ' gate BLOCKED uid=' + uid + ' (no token)');
   const e = new Error('[[rulesquiz:' + key + ']] [' + code + ']');
   e.code = code;
   throw e;
