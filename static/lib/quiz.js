@@ -70,16 +70,20 @@ define('forum/plugins/rules-quiz', [
 
 	/**
 	 * Decide which screen to show on first load based on settings + gateAck.
+	 * The rules-ack and intro screens ONLY apply to the onboarding flow.
+	 * For per-post / per-topic mini-quizzes we jump straight to the
+	 * questions — the user is already onboarded.
 	 */
 	function decideInitialScreen() {
 		const s = state.settings || {};
 		const rules = s.rules || {};
 		const intro = s.intro || {};
-		if (rules.showRulesGate && !state.gateAck) {
+		const isOnboarding = !state.mode || state.mode === 'onboarding';
+		if (isOnboarding && rules.showRulesGate && !state.gateAck) {
 			showScreen(SCREEN_RULES);
 			return;
 		}
-		if (intro.show) {
+		if (isOnboarding && intro.show) {
 			showScreen(SCREEN_INTRO);
 			return;
 		}
@@ -401,6 +405,22 @@ define('forum/plugins/rules-quiz', [
 
 		const total = state.questions.length;
 		const idx = state.idx;
+
+		// Gate-progress header ("שער פוסט #3 מתוך 10") — rendered at the
+		// top of gated (post/topic) quizzes.
+		const gpEl = document.getElementById('rq-gate-progress');
+		if (state.gateProgress && state.mode && state.mode !== 'onboarding') {
+			const gp = state.gateProgress;
+			const label = gp.kind === 'topic'
+				? ('שער נושא #' + gp.current + ' מתוך ' + gp.total)
+				: ('שער פוסט #' + gp.current + ' מתוך ' + gp.total);
+			if (gpEl) {
+				gpEl.textContent = label;
+				gpEl.hidden = false;
+			}
+		} else if (gpEl) {
+			gpEl.hidden = true;
+		}
 		const pct = total > 0 ? Math.round(((idx + 1) / total) * 100) : 0;
 		const bar = document.getElementById('rq-progress-bar');
 		const ptxt = document.getElementById('rq-progress-text');
@@ -856,6 +876,8 @@ define('forum/plugins/rules-quiz', [
 			gateAck: !!boot.gateAck,
 			rtl: !!boot.rtl,
 			lang: boot.lang || 'en-GB',
+			mode: boot.mode || 'onboarding',
+			gateProgress: boot.gateProgress || null,
 			idx: 0,
 			answers: {},
 		};

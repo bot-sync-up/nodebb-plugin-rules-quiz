@@ -72,6 +72,7 @@
 #rulesquiz-app .rq-result-msg{max-width:500px;margin:1rem auto 1.75rem;color:#475569;line-height:1.65}
 #rulesquiz-app .rq-result .rq-actions{justify-content:center}
 #rulesquiz-app .rq-cooldown-counter{font-variant-numeric:tabular-nums;font-weight:700;color:#dc2626;background:#fee2e2;padding:.4rem .9rem;border-radius:8px;display:inline-block;margin-top:.5rem}
+#rulesquiz-app .rq-gate-progress{display:inline-block;padding:.35rem .85rem;background:linear-gradient(135deg,#eff4ff,#e0e9ff);color:#1e40af;border-radius:999px;font-size:.92em;font-weight:700;margin:0 0 .8rem;border:1px solid #c7d7ff}
 /* Per-question breakdown */
 #rulesquiz-app .rq-pq-list{margin:2rem auto 0;max-width:640px;text-align:start}
 #rulesquiz-app .rq-pq-heading{font-size:1.15em;font-weight:700;margin:0 0 1rem;color:#334155;text-align:center}
@@ -155,6 +156,7 @@
 	<section id="rulesquiz-quiz" class="rq-screen" hidden style="display:none">
 		<div class="rq-card">
 			<header class="rq-quiz-header">
+				<div id="rq-gate-progress" class="rq-gate-progress" hidden></div>
 				<h1 class="rq-heading">[[rulesquiz:title]]</h1>
 				<div class="rq-quiz-meta">
 					<span id="rq-timer" class="rq-timer" hidden></span>
@@ -177,7 +179,7 @@
 
 	<div id="rulesquiz-result" class="rq-screen" hidden style="display:none"></div>
 
-	<script type="application/json" id="rulesquiz-bootstrap">{"questions":{questionsJson},"settings":{settingsJson},"gateAck":{{{ if gateAck }}}true{{{ else }}}false{{{ end }}},"rtl":{{{ if rtl }}}true{{{ else }}}false{{{ end }}},"lang":"{lang}"}</script>
+	<script type="application/json" id="rulesquiz-bootstrap">{"questions":{questionsJson},"settings":{settingsJson},"gateAck":{{{ if gateAck }}}true{{{ else }}}false{{{ end }}},"rtl":{{{ if rtl }}}true{{{ else }}}false{{{ end }}},"lang":"{lang}","mode":"{mode}","gateProgress":{gateProgressJson}}</script>
 </div>
 
 <script>
