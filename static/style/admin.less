@@ -220,6 +220,91 @@
 		background-color: rgba(40, 167, 69, 0.15);
 	}
 
+	// Users tab
+	.rq-user-panel {
+		padding: 1rem 1.25rem;
+		border: 1px solid #e2e8f0;
+		border-radius: 10px;
+		background: #fafbfc;
+		margin-top: 1rem;
+	}
+	.rq-user-head {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		flex-wrap: wrap;
+		margin-bottom: .75rem;
+		.rq-user-username {
+			font-size: 1.05em;
+		}
+	}
+	.rq-user-stats {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+		gap: .5rem;
+		margin: .75rem 0;
+	}
+	.rq-stat-chip {
+		display: flex;
+		flex-direction: column;
+		padding: .5rem .75rem;
+		background: #fff;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		font-size: .9em;
+		.rq-stat-label {
+			color: #64748b;
+			font-size: .85em;
+		}
+		.rq-stat-value {
+			font-weight: 700;
+		}
+	}
+	.rq-user-actions {
+		display: flex;
+		gap: .5rem;
+		flex-wrap: wrap;
+		margin-top: 1rem;
+	}
+	.rq-user-attempts-heading {
+		margin-top: 1.25rem;
+		font-size: 1em;
+		font-weight: 600;
+		color: #2c3e50;
+	}
+
+	// Reports: per-gate breakdown
+	.rq-gate-breakdown {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 1rem;
+		margin-top: 1.5rem;
+	}
+	.rq-gate-card {
+		padding: 1rem;
+		border-radius: 10px;
+		background: #fff;
+		border: 1px solid #e2e8f0;
+		text-align: center;
+		h4 {
+			margin: 0 0 .5rem;
+			font-size: 1em;
+		}
+		.rq-pass {
+			color: #16a34a;
+			font-weight: 700;
+		}
+		.rq-fail {
+			color: #dc2626;
+			font-weight: 700;
+		}
+	}
+
+	// Failing users list
+	.rq-failing-users .badge {
+		font-size: 12px;
+	}
+
 	// utility
 	.hidden { display: none !important; }
 }
