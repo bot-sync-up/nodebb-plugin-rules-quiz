@@ -11,13 +11,14 @@
 #rulesquiz-app #rulesquiz-intro .rq-heading::before{content:"👋";font-size:1em}
 #rulesquiz-app #rulesquiz-quiz .rq-heading::before{content:"❓";font-size:1em}
 #rulesquiz-app .rq-actions{margin-top:1.5rem;display:flex;gap:.6rem;flex-wrap:wrap}
-#rulesquiz-app .rq-btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.8rem 1.5rem;border-radius:10px;border:1px solid transparent;background:#fff;cursor:pointer;font:inherit;font-weight:600;color:#1f2933;transition:all .15s ease;min-height:46px}
-#rulesquiz-app .rq-btn:hover:not([disabled]){transform:translateY(-1px)}
-#rulesquiz-app .rq-btn--primary{background:linear-gradient(135deg,#4f7cff,#3b5fe2);color:#fff;border-color:#3b5fe2;box-shadow:0 2px 8px rgba(79,124,255,.35)}
-#rulesquiz-app .rq-btn--primary:hover:not([disabled]){background:linear-gradient(135deg,#3b5fe2,#2d4ac0);box-shadow:0 4px 14px rgba(79,124,255,.45)}
-#rulesquiz-app .rq-btn--ghost{background:#fff;color:#475569;border-color:#cbd5e1}
-#rulesquiz-app .rq-btn--ghost:hover:not([disabled]){background:#f1f5f9;border-color:#94a3b8}
-#rulesquiz-app .rq-btn[disabled]{opacity:.45;cursor:not-allowed;transform:none!important;box-shadow:none}
+#rulesquiz-app button.rq-btn,#rulesquiz-app a.rq-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:.4rem!important;padding:.8rem 1.5rem!important;border-radius:10px!important;border:1px solid transparent!important;background:#fff!important;cursor:pointer!important;font:inherit!important;font-weight:600!important;color:#1f2933!important;transition:all .15s ease!important;min-height:46px!important;text-decoration:none!important;line-height:1.4!important;box-sizing:border-box!important}
+#rulesquiz-app button.rq-btn:hover:not([disabled]){transform:translateY(-1px)}
+#rulesquiz-app button.rq-btn--primary,#rulesquiz-app a.rq-btn--primary{background:linear-gradient(135deg,#4f7cff,#3b5fe2)!important;color:#fff!important;border-color:#3b5fe2!important;box-shadow:0 2px 8px rgba(79,124,255,.35)!important}
+#rulesquiz-app button.rq-btn--primary:hover:not([disabled]),#rulesquiz-app a.rq-btn--primary:hover:not([disabled]){background:linear-gradient(135deg,#3b5fe2,#2d4ac0)!important;box-shadow:0 4px 14px rgba(79,124,255,.45)!important}
+#rulesquiz-app button.rq-btn--ghost,#rulesquiz-app a.rq-btn--ghost{background:#fff!important;color:#475569!important;border-color:#cbd5e1!important}
+#rulesquiz-app button.rq-btn--ghost:hover:not([disabled]){background:#f1f5f9!important;border-color:#94a3b8!important}
+#rulesquiz-app button.rq-btn[disabled]{opacity:.45!important;cursor:not-allowed!important;transform:none!important;box-shadow:none!important}
+#rulesquiz-app button.rq-btn[hidden]{display:none!important}
 #rulesquiz-app .rq-checkbox{display:flex;align-items:center;gap:.7rem;margin:1.25rem 0;padding:.85rem 1.1rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;font-weight:500;transition:all .15s ease}
 #rulesquiz-app .rq-checkbox:hover{background:#f1f5f9;border-color:#cbd5e1}
 #rulesquiz-app .rq-checkbox input[type="checkbox"]{width:1.25rem;height:1.25rem;margin:0;cursor:pointer;accent-color:#4f7cff}
