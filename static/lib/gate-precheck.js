@@ -56,20 +56,19 @@
 	}
 
 	// Selectors for reply / new-topic buttons across NodeBB themes.
+	// ONLY match the actual submit buttons that begin a composer session.
+	// We previously matched any link ending in "/compose" and broad class
+	// names like ".new-topic" which caught unrelated navigation buttons
+	// and unexpectedly redirected users browsing /categories to the quiz.
 	var REPLY_SELECTORS = [
 		'[component="topic/reply"]',
 		'[component="post/reply"]',
 		'[component="post/quote"]',
 		'[data-action="reply"]',
-		'.post-tools [data-component="post/reply"]',
-		'.btn-reply',
 	];
 	var TOPIC_SELECTORS = [
 		'[component="category/post"]',
 		'[data-action="newtopic"]',
-		'.new-topic',
-		'.btn-new-topic',
-		'a[href$="/compose"]',
 	];
 
 	function matchesAny(el, selectors) {
