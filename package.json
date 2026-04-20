@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-rules-quiz",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "description": "Gates new (and optionally existing) NodeBB users behind a configurable forum-rules quiz before they can post.",
   "main": "library.js",
   "repository": {
