@@ -20,6 +20,32 @@ const winston = (() => {
 const plugin = {};
 
 /**
+ * In-memory cache of recent gate passes, keyed by `${uid}:${kind}`.
+ * Used to survive the race between NodeBB's filter:post.shouldQueue
+ * and the immediately-following filter:post-queue.save / filter:topic.reply:
+ * both fire within milliseconds for the same user action, both read the
+ * user state BEFORE the first one's db.setUserState await resolves, so a
+ * DB-backed grace period is useless. An in-process Map is synchronous and
+ * immune to that.
+ *
+ * Entries older than 15s are swept on the next insert.
+ */
+const recentGatePasses = new Map();
+function rememberGatePass(uid, kind) {
+  recentGatePasses.set(uid + ':' + kind, Date.now());
+  if (recentGatePasses.size > 500) {
+    const now = Date.now();
+    for (const [k, t] of recentGatePasses) {
+      if (now - t > 15000) recentGatePasses.delete(k);
+    }
+  }
+}
+function hasRecentGatePass(uid, kind) {
+  const t = recentGatePasses.get(uid + ':' + kind) || 0;
+  return t > 0 && (Date.now() - t) < 10000; // 10s grace window
+}
+
+/**
  * static:app.load
  * Initial setup: ensure default settings exist, mount page routes.
  */
@@ -217,23 +243,20 @@ async function guardKind(kind, data) {
     }
   }
 
-  // Grace period: a single "post reply" action fires multiple hooks in
-  // sequence (filter:post.shouldQueue → filter:post-queue.save OR
-  // filter:topic.reply). The first hook consumes the token; without a
-  // grace window the second hook would reject the same request and the
-  // user loops back to the quiz forever. If the user passed this same
-  // kind within the last 10s, treat it as the same request chain.
-  const GRACE_MS = 10 * 1000;
-  const lastGateAt = Number((state && state.lastGateAt) || 0);
-  const lastGateKind = state && state.lastGateKind;
-  if (lastGateKind === kind && (now - lastGateAt) < GRACE_MS) {
-    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid
-      + ' (grace-period, ' + Math.round((now - lastGateAt) / 1000) + 's since last pass)');
+  // In-memory grace: a single user action fires multiple hooks within
+  // milliseconds and they race for the same user state. If this uid has
+  // already passed the same-kind gate in the last 10s (via the first hook
+  // in the chain), let the second hook through without touching the DB.
+  if (hasRecentGatePass(uid, kind)) {
+    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' (in-memory grace)');
     return data;
   }
 
   if (hasToken) {
-    // Consume (single-use) + increment the kind counter + set grace stamp.
+    // Mark in-memory grace BEFORE the DB write so the racing hook sees it
+    // synchronously even if its state read is already in-flight.
+    rememberGatePass(uid, kind);
+    // Consume (single-use) + increment the kind counter + leave a DB trail.
     const nextState = {};
     nextState[countField] = already + 1;
     nextState[dbField] = 0;
