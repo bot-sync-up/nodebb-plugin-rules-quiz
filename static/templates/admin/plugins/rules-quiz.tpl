@@ -40,6 +40,11 @@
 			</a>
 		</li>
 		<li class="nav-item" role="presentation">
+			<a class="nav-link" data-toggle="tab" data-bs-toggle="tab" href="#rq-tab-users" role="tab">
+				[[rulesquiz:admin.users]]
+			</a>
+		</li>
+		<li class="nav-item" role="presentation">
 			<a class="nav-link" data-toggle="tab" data-bs-toggle="tab" href="#rq-tab-reports" role="tab">
 				[[rulesquiz:admin.reports]]
 			</a>
@@ -235,6 +240,94 @@
 					</div>
 				</div>
 
+				<div class="rq-card">
+					<h3>[[rulesquiz:admin.section.postGate]]</h3>
+					<div class="form-check form-switch rq-row">
+						<input type="checkbox" class="form-check-input" id="rq-postGate-enabled" data-field="postGate.enabled">
+						<label class="form-check-label" for="rq-postGate-enabled">[[rulesquiz:admin.field.postGateEnabled]]</label>
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-postGate-applyForFirstN">[[rulesquiz:admin.field.postGateApplyForFirstN]]</label>
+						<input type="number" min="0" class="form-control" id="rq-postGate-applyForFirstN" data-field="postGate.applyForFirstN">
+						<small class="form-text text-muted">[[rulesquiz:admin.help.postGateApplyForFirstN]]</small>
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-postGate-sampleSize">[[rulesquiz:admin.field.postGateSampleSize]]</label>
+						<input type="number" min="0" class="form-control" id="rq-postGate-sampleSize" data-field="postGate.sampleSize">
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-postGate-passPercent">[[rulesquiz:admin.field.postGatePassPercent]]</label>
+						<input type="number" min="0" max="100" class="form-control" id="rq-postGate-passPercent" data-field="postGate.passPercent">
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-postGate-cooldownSec">[[rulesquiz:admin.field.postGateCooldownSec]]</label>
+						<input type="number" min="0" class="form-control" id="rq-postGate-cooldownSec" data-field="postGate.cooldownSec">
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-postGate-onFailMode">[[rulesquiz:admin.field.postGateOnFailMode]]</label>
+						<select class="form-control" id="rq-postGate-onFailMode" data-field="postGate.onFailMode">
+							<option value="retry">[[rulesquiz:admin.opt.retry]]</option>
+							<option value="cooldown">[[rulesquiz:admin.opt.cooldown]]</option>
+							<option value="lock_after_attempts">[[rulesquiz:admin.opt.lock_after_attempts]]</option>
+							<option value="daily_limit">[[rulesquiz:admin.opt.daily_limit]]</option>
+						</select>
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-postGate-lockAfterAttempts">[[rulesquiz:admin.field.postGateLockAfterAttempts]]</label>
+						<input type="number" min="0" class="form-control" id="rq-postGate-lockAfterAttempts" data-field="postGate.lockAfterAttempts">
+					</div>
+				</div>
+
+				<div class="rq-card">
+					<h3>[[rulesquiz:admin.section.topicGate]]</h3>
+					<div class="form-check form-switch rq-row">
+						<input type="checkbox" class="form-check-input" id="rq-topicGate-enabled" data-field="topicGate.enabled">
+						<label class="form-check-label" for="rq-topicGate-enabled">[[rulesquiz:admin.field.topicGateEnabled]]</label>
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-topicGate-applyForFirstN">[[rulesquiz:admin.field.topicGateApplyForFirstN]]</label>
+						<input type="number" min="0" class="form-control" id="rq-topicGate-applyForFirstN" data-field="topicGate.applyForFirstN">
+						<small class="form-text text-muted">[[rulesquiz:admin.help.topicGateApplyForFirstN]]</small>
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-topicGate-sampleSize">[[rulesquiz:admin.field.topicGateSampleSize]]</label>
+						<input type="number" min="0" class="form-control" id="rq-topicGate-sampleSize" data-field="topicGate.sampleSize">
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-topicGate-passPercent">[[rulesquiz:admin.field.topicGatePassPercent]]</label>
+						<input type="number" min="0" max="100" class="form-control" id="rq-topicGate-passPercent" data-field="topicGate.passPercent">
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-topicGate-cooldownSec">[[rulesquiz:admin.field.topicGateCooldownSec]]</label>
+						<input type="number" min="0" class="form-control" id="rq-topicGate-cooldownSec" data-field="topicGate.cooldownSec">
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-topicGate-onFailMode">[[rulesquiz:admin.field.topicGateOnFailMode]]</label>
+						<select class="form-control" id="rq-topicGate-onFailMode" data-field="topicGate.onFailMode">
+							<option value="retry">[[rulesquiz:admin.opt.retry]]</option>
+							<option value="cooldown">[[rulesquiz:admin.opt.cooldown]]</option>
+							<option value="lock_after_attempts">[[rulesquiz:admin.opt.lock_after_attempts]]</option>
+							<option value="daily_limit">[[rulesquiz:admin.opt.daily_limit]]</option>
+						</select>
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-topicGate-lockAfterAttempts">[[rulesquiz:admin.field.topicGateLockAfterAttempts]]</label>
+						<input type="number" min="0" class="form-control" id="rq-topicGate-lockAfterAttempts" data-field="topicGate.lockAfterAttempts">
+					</div>
+				</div>
+
+				<div class="rq-card">
+					<h3>[[rulesquiz:admin.section.pool]]</h3>
+					<div class="form-group rq-row">
+						<label for="rq-pool-mode">[[rulesquiz:admin.field.poolMode]]</label>
+						<select class="form-control" id="rq-pool-mode" data-field="pool.mode">
+							<option value="single_tagged">[[rulesquiz:admin.opt.pool_single_tagged]]</option>
+							<option value="separate">[[rulesquiz:admin.opt.pool_separate]]</option>
+						</select>
+						<small class="form-text text-muted">[[rulesquiz:admin.help.poolMode]]</small>
+					</div>
+				</div>
+
 				<div class="rq-actions">
 					<button type="button" class="btn btn-outline-secondary btn-default rq-test-save-btn" id="rq-test-save" title="[[rulesquiz:admin.test_save_help]]">
 						<i class="fa fa-flask"></i> [[rulesquiz:admin.test_save]]
@@ -279,7 +372,93 @@
 			</div>
 		</div>
 
-		<!-- ============== REPORTS TAB ============== -->
+		<!-- ============== USERS TAB ============== -->
+			<div class="tab-pane fade" id="rq-tab-users" role="tabpanel">
+				<div class="rq-card">
+					<h3>[[rulesquiz:admin.users.lookup]]</h3>
+					<div class="form-inline rq-lookup-form">
+						<label for="rq-user-search-input">[[rulesquiz:admin.field.uid]]</label>
+						<input type="number" class="form-control" id="rq-user-search-input" min="1" placeholder="123">
+						<button type="button" class="btn btn-primary" id="rq-user-search-btn">
+							<i class="fa fa-search"></i> [[rulesquiz:admin.users.search]]
+						</button>
+					</div>
+
+					<div class="rq-user-panel hidden d-none" id="rq-user-panel">
+						<div class="rq-user-head">
+							<strong class="rq-user-username" id="rq-user-username">--</strong>
+							<span class="text-muted">(uid <span id="rq-user-uid">--</span>)</span>
+							<a href="#" target="_blank" rel="noopener" id="rq-user-profile-link" class="btn btn-xs btn-sm btn-default btn-outline-secondary">
+								<i class="fa fa-external-link"></i> [[rulesquiz:admin.users.profile]]
+							</a>
+						</div>
+
+						<div class="rq-user-stats">
+							<div class="rq-stat-chip">
+								<span class="rq-stat-label">[[rulesquiz:admin.users.status]]</span>
+								<span class="rq-stat-value" id="rq-user-status">--</span>
+							</div>
+							<div class="rq-stat-chip">
+								<span class="rq-stat-label">[[rulesquiz:admin.users.attempts]]</span>
+								<span class="rq-stat-value" id="rq-user-attempts">--</span>
+							</div>
+							<div class="rq-stat-chip">
+								<span class="rq-stat-label">[[rulesquiz:admin.users.postsCreated]]</span>
+								<span class="rq-stat-value" id="rq-user-postsCreated">--</span>
+							</div>
+							<div class="rq-stat-chip">
+								<span class="rq-stat-label">[[rulesquiz:admin.users.topicsCreated]]</span>
+								<span class="rq-stat-value" id="rq-user-topicsCreated">--</span>
+							</div>
+							<div class="rq-stat-chip">
+								<span class="rq-stat-label">[[rulesquiz:admin.users.gateAck]]</span>
+								<span class="rq-stat-value" id="rq-user-gateAck">--</span>
+							</div>
+							<div class="rq-stat-chip">
+								<span class="rq-stat-label">[[rulesquiz:admin.users.postTokenExp]]</span>
+								<span class="rq-stat-value" id="rq-user-postTokenExp">--</span>
+							</div>
+							<div class="rq-stat-chip">
+								<span class="rq-stat-label">[[rulesquiz:admin.users.topicTokenExp]]</span>
+								<span class="rq-stat-value" id="rq-user-topicTokenExp">--</span>
+							</div>
+						</div>
+
+						<div class="rq-user-actions">
+							<button type="button" class="btn btn-default btn-outline-secondary" id="rq-user-reset-counters-btn">
+								<i class="fa fa-refresh"></i> [[rulesquiz:admin.users.reset_counters]]
+							</button>
+							<button type="button" class="btn btn-default btn-outline-secondary" id="rq-user-reset-onboarding-btn">
+								<i class="fa fa-undo"></i> [[rulesquiz:admin.users.reset_onboarding]]
+							</button>
+							<button type="button" class="btn btn-success" id="rq-user-exempt-btn">
+								<i class="fa fa-check"></i> [[rulesquiz:admin.users.exempt]]
+							</button>
+							<button type="button" class="btn btn-warning" id="rq-user-unexempt-btn">
+								<i class="fa fa-times"></i> [[rulesquiz:admin.users.unexempt]]
+							</button>
+						</div>
+
+						<h4 class="rq-user-attempts-heading">[[rulesquiz:admin.users.recent_attempts]]</h4>
+						<div class="table-responsive">
+							<table class="table table-striped rq-attempts-table">
+								<thead>
+									<tr>
+										<th>[[rulesquiz:admin.col.aid]]</th>
+										<th>[[rulesquiz:admin.col.started]]</th>
+										<th>[[rulesquiz:admin.col.finished]]</th>
+										<th>[[rulesquiz:admin.col.score]]</th>
+										<th>[[rulesquiz:admin.col.passed]]</th>
+									</tr>
+								</thead>
+								<tbody id="rq-user-attempts-tbody"></tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- ============== REPORTS TAB ============== -->
 		<div class="tab-pane fade" id="rq-tab-reports" role="tabpanel">
 			<div class="row">
 				<div class="col-md-4">
@@ -303,7 +482,32 @@
 			</div>
 
 			<div class="rq-card">
-				<h3>[[rulesquiz:admin.stat.daily]]</h3>
+				<h3>[[rulesquiz:admin.stat.byGate]]</h3>
+					<div class="rq-gate-breakdown">
+						<div class="rq-gate-card">
+							<h4>[[rulesquiz:admin.stat.gate.onboarding]]</h4>
+							<div><span class="rq-pass" id="rq-gate-onboarding-passed">0</span> / <span class="rq-fail" id="rq-gate-onboarding-failed">0</span></div>
+						</div>
+						<div class="rq-gate-card">
+							<h4>[[rulesquiz:admin.stat.gate.post]]</h4>
+							<div><span class="rq-pass" id="rq-gate-post-passed">0</span> / <span class="rq-fail" id="rq-gate-post-failed">0</span></div>
+						</div>
+						<div class="rq-gate-card">
+							<h4>[[rulesquiz:admin.stat.gate.topic]]</h4>
+							<div><span class="rq-pass" id="rq-gate-topic-passed">0</span> / <span class="rq-fail" id="rq-gate-topic-failed">0</span></div>
+						</div>
+					</div>
+				</div>
+
+				<div class="rq-card">
+					<h3>[[rulesquiz:admin.stat.failingUsers]]</h3>
+					<ul class="rq-failing-users list-group" id="rq-failing-users-list">
+						<li class="list-group-item text-muted">[[rulesquiz:admin.loading]]</li>
+					</ul>
+				</div>
+
+				<div class="rq-card">
+					<h3>[[rulesquiz:admin.stat.daily]]</h3>
 				<div class="rq-chart-wrap">
 					<canvas id="rulesquiz-daily-chart" height="120"></canvas>
 				</div>

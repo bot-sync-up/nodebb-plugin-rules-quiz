@@ -7,6 +7,7 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		settings: null,
 		questions: [],
 		editingQid: null,
+		currentUser: null,
 	};
 
 	// ---------------------------------------------------------------
@@ -713,6 +714,7 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 			$('#rq-stat-failed').text(totals.failed || 0);
 			renderHardest(data.hardestQuestions || []);
 			renderDailyChart(data.daily || []);
+			renderGateBreakdown(data.byGate || {});
 		}).catch(function (err) {
 			alerts.error('[[rulesquiz:admin.error.load_stats]]: ' + (err && err.message ? err.message : err));
 		});
@@ -750,6 +752,173 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 			translator.translate($tb.html(), function (t) { $tb.html(t); });
 		}).catch(function (err) {
 			alerts.error('[[rulesquiz:admin.error.load_attempts]]: ' + (err && err.message ? err.message : err));
+		});
+	}
+
+	// ---------------------------------------------------------------
+	// users tab
+	// ---------------------------------------------------------------
+
+	function confirmAction(message) {
+		return new Promise(function (resolve) {
+			if (window.bootbox && typeof window.bootbox.confirm === 'function') {
+				try {
+					window.bootbox.confirm(message, function (ok) { resolve(!!ok); });
+					return;
+				} catch (e) { /* fall through */ }
+			}
+			resolve(window.confirm(message));
+		});
+	}
+
+	function fmtTimestamp(val) {
+		if (!val) { return '--'; }
+		try {
+			var d = (typeof val === 'number') ? new Date(val) : new Date(val);
+			if (isNaN(d.getTime())) { return String(val); }
+			return d.toLocaleString();
+		} catch (e) { return String(val); }
+	}
+
+	function renderUserAttemptsTable(attempts) {
+		var $tb = $('#rq-user-attempts-tbody');
+		if (!Array.isArray(attempts) || !attempts.length) {
+			$tb.html('<tr><td colspan="5" class="text-center text-muted">[[rulesquiz:admin.no_attempts]]</td></tr>');
+			translator.translate($tb.html(), function (t) { $tb.html(t); });
+			return;
+		}
+		$tb.html(attempts.map(function (a) {
+			var started = a.startedAt ? new Date(a.startedAt).toLocaleString() : '';
+			var finished = a.finishedAt ? new Date(a.finishedAt).toLocaleString() : '';
+			var passClass = a.passed ? 'text-success' : 'text-danger';
+			var passText = a.passed ? '[[rulesquiz:pass]]' : '[[rulesquiz:fail]]';
+			return '<tr>' +
+				'<td>' + escapeHtml(a.aid) + '</td>' +
+				'<td>' + escapeHtml(started) + '</td>' +
+				'<td>' + escapeHtml(finished) + '</td>' +
+				'<td>' + escapeHtml(a.score) + ' / ' + escapeHtml(a.total) + '</td>' +
+				'<td class="' + passClass + '">' + passText + '</td>' +
+				'</tr>';
+		}).join(''));
+		translator.translate($tb.html(), function (t) { $tb.html(t); });
+	}
+
+	function populateUserPanel(uid, info) {
+		info = info || {};
+		state.currentUser = { uid: uid, info: info };
+		var userState = info.user || info.state || info || {};
+		var username = info.username || userState.username || ('uid' + uid);
+
+		$('#rq-user-panel').removeClass('d-none hidden');
+		$('#rq-user-username').text(username);
+		$('#rq-user-uid').text(uid);
+		$('#rq-user-profile-link').attr('href', (window.config && window.config.relative_path ? window.config.relative_path : '') + '/uid/' + encodeURIComponent(uid));
+
+		$('#rq-user-status').text(userState.status || '--');
+		$('#rq-user-attempts').text(userState.attempts != null ? userState.attempts : '--');
+		$('#rq-user-postsCreated').text(userState.postsCreated != null ? userState.postsCreated : '--');
+		$('#rq-user-topicsCreated').text(userState.topicsCreated != null ? userState.topicsCreated : '--');
+		$('#rq-user-gateAck').text(userState.gateAck ? '[[rulesquiz:admin.users.ack_yes]]' : '[[rulesquiz:admin.users.ack_no]]');
+		$('#rq-user-postTokenExp').text(fmtTimestamp(userState.postTokenExp));
+		$('#rq-user-topicTokenExp').text(fmtTimestamp(userState.topicTokenExp));
+
+		translator.translate($('#rq-user-panel').html(), function (t) { $('#rq-user-panel').html(t); });
+
+		// load attempts
+		apiFetch('GET', API_BASE + '/users/' + encodeURIComponent(uid) + '/attempts').then(function (resp) {
+			var data = unwrap(resp) || {};
+			var attempts = data.attempts || data || [];
+			if (!Array.isArray(attempts)) { attempts = []; }
+			renderUserAttemptsTable(attempts);
+		}).catch(function (err) {
+			alerts.error('[[rulesquiz:admin.error.load_attempts]]: ' + (err && err.message ? err.message : err));
+		});
+	}
+
+	function searchUser(uid) {
+		if (!uid) {
+			alerts.error('[[rulesquiz:admin.error.no_uid]]');
+			return;
+		}
+		apiFetch('GET', API_BASE + '/users/' + encodeURIComponent(uid)).then(function (resp) {
+			var data = unwrap(resp) || {};
+			if (data && typeof data === 'object' && data.user && typeof data.user === 'object') {
+				populateUserPanel(uid, data);
+			} else {
+				populateUserPanel(uid, data);
+			}
+		}).catch(function (err) {
+			alerts.error('[[rulesquiz:admin.error.load_user]]: ' + (err && err.message ? err.message : err));
+		});
+	}
+
+	function doUserAction(actionPath, confirmKey) {
+		var cu = state.currentUser;
+		if (!cu || !cu.uid) {
+			alerts.error('[[rulesquiz:admin.error.no_user_loaded]]');
+			return;
+		}
+		var uid = cu.uid;
+		confirmAction(confirmKey).then(function (ok) {
+			if (!ok) { return; }
+			apiFetch('POST', API_BASE + '/users/' + encodeURIComponent(uid) + actionPath, {}).then(function (resp) {
+				alerts.success('[[rulesquiz:admin.users.action_ok]]');
+				// reload panel
+				searchUser(uid);
+			}).catch(function (err) {
+				alerts.error('[[rulesquiz:admin.users.action_err]]: ' + (err && err.message ? err.message : err));
+			});
+		});
+	}
+
+	// ---------------------------------------------------------------
+	// reports: per-gate breakdown + failing users
+	// ---------------------------------------------------------------
+
+	function renderGateBreakdown(byGate) {
+		byGate = byGate || {};
+		['onboarding', 'post', 'topic'].forEach(function (gate) {
+			var row = byGate[gate] || {};
+			$('#rq-gate-' + gate + '-passed').text(row.passed || 0);
+			$('#rq-gate-' + gate + '-failed').text(row.failed || 0);
+		});
+	}
+
+	function renderFailingUsers(list) {
+		var $ul = $('#rq-failing-users-list');
+		if (!Array.isArray(list) || !list.length) {
+			$ul.html('<li class="list-group-item text-muted">[[rulesquiz:admin.empty_failing_users]]</li>');
+			translator.translate($ul.html(), function (t) { $ul.html(t); });
+			return;
+		}
+		var html = list.map(function (u) {
+			var uid = u.uid;
+			var username = u.username || ('uid' + uid);
+			var fails = u.failCount || u.fails || 0;
+			return '<li class="list-group-item d-flex justify-content-between align-items-center">' +
+				'<span>' + escapeHtml(username) + ' <small class="text-muted">#' + escapeHtml(uid) + '</small></span>' +
+				'<span>' +
+					'<span class="badge bg-danger badge-danger">' + escapeHtml(fails) + '</span> ' +
+					'<button type="button" class="btn btn-xs btn-sm btn-default btn-outline-secondary rq-failing-view" data-uid="' + escapeHtml(uid) + '">' +
+						'<i class="fa fa-user"></i> [[rulesquiz:admin.users.view]]' +
+					'</button>' +
+				'</span>' +
+				'</li>';
+		}).join('');
+		$ul.html(html);
+		translator.translate($ul.html(), function (t) { $ul.html(t); });
+	}
+
+	function loadFailingUsers() {
+		return apiFetch('GET', API_BASE + '/failing-users').then(function (resp) {
+			var data = unwrap(resp) || {};
+			var list = data.users || data || [];
+			if (!Array.isArray(list)) { list = []; }
+			renderFailingUsers(list);
+		}).catch(function (err) {
+			// non-fatal — endpoint may not exist yet
+			console.warn('[rules-quiz/acp] failing-users load failed', err);
+			renderFailingUsers([]);
 		});
 	}
 
@@ -803,9 +972,53 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 			lookupUserAttempts();
 		});
 
+		// users tab
+		$(document).off('click.rqusersearch').on('click.rqusersearch', '#rq-user-search-btn', function () {
+			var uid = $('#rq-user-search-input').val();
+			searchUser(uid);
+		});
+		$(document).off('keydown.rqusersearch').on('keydown.rqusersearch', '#rq-user-search-input', function (ev) {
+			if (ev.which === 13 || ev.key === 'Enter') {
+				ev.preventDefault();
+				var uid = $('#rq-user-search-input').val();
+				searchUser(uid);
+			}
+		});
+		$(document).off('click.rqusercounters').on('click.rqusercounters', '#rq-user-reset-counters-btn', function () {
+			doUserAction('/reset-counters', '[[rulesquiz:admin.users.confirm_reset_counters]]');
+		});
+		$(document).off('click.rquseronboarding').on('click.rquseronboarding', '#rq-user-reset-onboarding-btn', function () {
+			doUserAction('/reset-onboarding', '[[rulesquiz:admin.users.confirm_reset_onboarding]]');
+		});
+		$(document).off('click.rquserexempt').on('click.rquserexempt', '#rq-user-exempt-btn', function () {
+			doUserAction('/exempt', '[[rulesquiz:admin.users.confirm_exempt]]');
+		});
+		$(document).off('click.rquserunexempt').on('click.rquserunexempt', '#rq-user-unexempt-btn', function () {
+			doUserAction('/unexempt', '[[rulesquiz:admin.users.confirm_unexempt]]');
+		});
+
+		// failing-users "view" -> switch to users tab and prefill
+		$(document).off('click.rqfailingview').on('click.rqfailingview', '.rq-failing-view', function () {
+			var uid = $(this).attr('data-uid');
+			if (!uid) { return; }
+			$('#rq-user-search-input').val(uid);
+			var $link = $('a[href="#rq-tab-users"]');
+			if ($link.length) {
+				if (window.bootstrap && window.bootstrap.Tab) {
+					try { window.bootstrap.Tab.getOrCreateInstance($link[0]).show(); } catch (e) { $link.tab && $link.tab('show'); }
+				} else if (typeof $link.tab === 'function') {
+					$link.tab('show');
+				} else {
+					$link.trigger('click');
+				}
+			}
+			searchUser(uid);
+		});
+
 		// reports tab activation -> lazy load
 		$(document).off('shown.bs.tab.rqreports show.bs.tab.rqreports').on('shown.bs.tab show.bs.tab', 'a[href="#rq-tab-reports"]', function () {
 			loadStats();
+			loadFailingUsers();
 		});
 		$(document).off('shown.bs.tab.rqquestions show.bs.tab.rqquestions').on('shown.bs.tab show.bs.tab', 'a[href="#rq-tab-questions"]', function () {
 			if (!state.questions.length) { loadQuestions(); }
