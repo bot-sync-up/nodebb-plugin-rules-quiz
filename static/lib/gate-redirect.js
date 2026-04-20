@@ -20,19 +20,13 @@
 	if (window.__rqGateRedirectWired) return;
 	window.__rqGateRedirectWired = true;
 
-	// Server error codes + human-readable fragments that appear in the
-	// translated toast. Either path triggers the redirect.
+	// ONLY match the exact gate codes we embed in the server error message.
+	// Earlier versions also matched Hebrew fragments like "לפני הפרסום"
+	// which collide with common NodeBB UI strings (composer preview banner,
+	// validation toasts, etc.) and caused the gate-redirect to fire
+	// spuriously on unrelated pages. Code-only matching is unambiguous.
 	var POST_CODE = 'rules-quiz:post-gate';
 	var TOPIC_CODE = 'rules-quiz:topic-gate';
-	var POST_MSG_HINTS = ['לפני הפרסום', 'need_post_quiz', 'pass.*post quiz'];
-	var TOPIC_MSG_HINTS = ['לפני פתיחת נושא', 'need_topic_quiz', 'pass.*topic quiz'];
-
-	function includesAny(hay, needles) {
-		for (var i = 0; i < needles.length; i++) {
-			if (hay.indexOf(needles[i]) !== -1) return true;
-		}
-		return false;
-	}
 
 	function redirect(mode) {
 		var returnTo = window.location.pathname + (window.location.search || '');
@@ -46,18 +40,26 @@
 		if (!el || el.dataset.rqSeen === '1') return;
 		var text = String(el.textContent || '');
 		if (!text) return;
-		el.dataset.rqSeen = '1';
-		if (text.indexOf(POST_CODE) !== -1 || includesAny(text, POST_MSG_HINTS)) {
+		// Only consume / redirect when our exact code marker is present.
+		// We mark the node as seen ONLY when we actually match, so other
+		// benign alerts aren't accidentally tagged.
+		if (text.indexOf(POST_CODE) !== -1) {
+			el.dataset.rqSeen = '1';
 			return redirect('post');
 		}
-		if (text.indexOf(TOPIC_CODE) !== -1 || includesAny(text, TOPIC_MSG_HINTS)) {
+		if (text.indexOf(TOPIC_CODE) !== -1) {
+			el.dataset.rqSeen = '1';
 			return redirect('topic');
 		}
 	}
 
 	function scan(root) {
+		// Narrower selector list: only the actual NodeBB alert / toast
+		// containers. [role="alert"] is too generic (NodeBB uses it on
+		// composer previews, form-validation banners, nav hints, etc.) and
+		// previously caused gate-redirect to fire on unrelated UI.
 		var nodes = (root || document).querySelectorAll(
-			'.alert-danger, .alert-error, .toast-error, [data-alert-type="error"], [role="alert"]'
+			'.alert-danger, .alert-error, .toast-error, .alert.alert-danger, [data-alert-type="error"]'
 		);
 		for (var i = 0; i < nodes.length; i++) inspect(nodes[i]);
 	}
@@ -75,7 +77,7 @@
 							inspect(n);
 							if (n.querySelectorAll) {
 								var kids = n.querySelectorAll(
-									'.alert-danger, .alert-error, .toast-error, [data-alert-type="error"], [role="alert"]'
+									'.alert-danger, .alert-error, .toast-error, .alert.alert-danger, [data-alert-type="error"]'
 								);
 								for (var k = 0; k < kids.length; k++) inspect(kids[k]);
 							}
