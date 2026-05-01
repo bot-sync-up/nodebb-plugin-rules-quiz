@@ -3,46 +3,116 @@
 /* global MutationObserver */
 
 /**
- * gate-redirect.js
+ * gate-redirect.js (v0.7.0)
  *
- * Runs on every forum page. When the server rejects a reply or a new topic
- * with one of our gate codes (`rules-quiz:post-gate` / `:topic-gate`), the
- * NodeBB composer surfaces the error via an alert toast. We detect that
- * alert and auto-navigate to the right mini-quiz at `/quiz?mode=…&returnTo=…`.
+ * Strategy: instead of trying to match server error toasts (which is
+ * fragile — translation + markup change between NodeBB versions and
+ * themes), we intercept the actual SUBMIT button clicks inside the
+ * composer. Right after the user clicks Submit we ask the server for
+ * the current gate status and, if a gate is active and the user has no
+ * token, redirect them to the matching mini-quiz.
  *
- * After passing, the quiz page itself bounces the user back to `returnTo`.
- * This module is self-initialising — no `define()` wrapper, no init() call
- * needed — it runs at script load time.
+ * The eager check fires only on submit-button clicks, never on Reply
+ * or New-Topic buttons that just open the composer — so the user can
+ * browse the forum freely. The actual submit may still go through if
+ * it races us; that's fine, the server will reject and we'll catch the
+ * follow-up alert via DOM scan as a backup.
  */
 
 (function () {
 	if (typeof window === 'undefined' || typeof document === 'undefined') return;
-	if (window.__rqGateRedirectWired) return;
-	window.__rqGateRedirectWired = true;
+	if (window.__rqGateRedirectV7) return;
+	window.__rqGateRedirectV7 = true;
 
-	// ONLY match the exact gate codes we embed in the server error message.
-	// Earlier versions also matched Hebrew fragments like "לפני הפרסום"
-	// which collide with common NodeBB UI strings (composer preview banner,
-	// validation toasts, etc.) and caused the gate-redirect to fire
-	// spuriously on unrelated pages. Code-only matching is unambiguous.
+	var STATUS_URL = '/api/v3/plugins/rules-quiz/gate-status';
 	var POST_CODE = 'rules-quiz:post-gate';
 	var TOPIC_CODE = 'rules-quiz:topic-gate';
 
-	function redirect(mode) {
-		var returnTo = window.location.pathname + (window.location.search || '');
-		try { sessionStorage.setItem('rqReturnTo', returnTo); } catch (_) { /* noop */ }
-		var url = '/quiz?mode=' + encodeURIComponent(mode)
-			+ '&returnTo=' + encodeURIComponent(returnTo);
-		window.location.href = url;
+	function currentReturnTo() {
+		return window.location.pathname + (window.location.search || '');
 	}
 
-	function inspect(el) {
+	function redirect(mode) {
+		var returnTo = currentReturnTo();
+		try { sessionStorage.setItem('rqReturnTo', returnTo); } catch (_) { /* noop */ }
+		window.location.href = '/quiz?mode=' + encodeURIComponent(mode)
+			+ '&returnTo=' + encodeURIComponent(returnTo);
+	}
+
+	function fetchStatus() {
+		return fetch(STATUS_URL, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+			.then(function (r) { return r.json(); })
+			.then(function (j) { return (j && j.response !== undefined) ? j.response : j; })
+			.catch(function () { return null; });
+	}
+
+	// Decide if this submit is a NEW TOPIC or a REPLY based on the composer
+	// header / hidden inputs. NodeBB composer-default puts a hidden field
+	// `data-action="post"` with a tid (= reply) or cid (= new topic).
+	function detectKind(submitEl) {
+		var composer = submitEl.closest('[component="composer"]')
+			|| submitEl.closest('.composer')
+			|| submitEl.closest('[data-cid],[data-tid]')
+			|| document.querySelector('[component="composer"]');
+		if (!composer) return 'post'; // safe default
+		// Topic creation has cid + title input, no tid.
+		if (composer.dataset && composer.dataset.tid) return 'post';
+		if (composer.dataset && composer.dataset.cid && !composer.dataset.tid) return 'topic';
+		// Fallback: look for a topic title input visible in the composer
+		var titleInput = composer.querySelector('input[name="title"]');
+		if (titleInput && titleInput.offsetParent !== null) return 'topic';
+		return 'post';
+	}
+
+	// Submit-button selectors — VERY specific so we never catch nav links.
+	var SUBMIT_SELECTORS = [
+		'[component="composer/submit"]',
+		'.composer-submit',
+		'[data-action="post"]',
+	];
+
+	function matchesAny(el, selectors) {
+		if (!el || !el.closest) return null;
+		for (var i = 0; i < selectors.length; i++) {
+			var m = el.closest(selectors[i]);
+			if (m) return m;
+		}
+		return null;
+	}
+
+	function onSubmitClick(e) {
+		var btn = matchesAny(e.target, SUBMIT_SELECTORS);
+		if (!btn) return;
+		// Eagerly check gate-status. If it shows we're blocked, preventDefault
+		// and redirect. We CANNOT block the click synchronously while we wait
+		// (fetch is async), so we let the click proceed AND queue a backup
+		// check 800ms later — if the gate response came back with a block,
+		// redirect even if NodeBB already errored out.
+		var kind = detectKind(btn);
+		setTimeout(function () {
+			fetchStatus().then(function (status) {
+				if (!status || !status.loggedIn) return;
+				if (kind === 'topic') {
+					if (status.topicGate && status.topicGate.active && !status.topicGate.hasToken) {
+						redirect('topic');
+					}
+				} else {
+					if (status.postGate && status.postGate.active && !status.postGate.hasToken) {
+						redirect('post');
+					}
+				}
+			});
+		}, 800);
+	}
+
+	document.addEventListener('click', onSubmitClick, true); // capture phase
+
+	// Backup: also scan for our exact code markers in alert toasts. Useful
+	// if NodeBB shows the error in a non-standard container.
+	function inspectAlert(el) {
 		if (!el || el.dataset.rqSeen === '1') return;
 		var text = String(el.textContent || '');
 		if (!text) return;
-		// Only consume / redirect when our exact code marker is present.
-		// We mark the node as seen ONLY when we actually match, so other
-		// benign alerts aren't accidentally tagged.
 		if (text.indexOf(POST_CODE) !== -1) {
 			el.dataset.rqSeen = '1';
 			return redirect('post');
@@ -53,19 +123,15 @@
 		}
 	}
 
-	function scan(root) {
-		// Narrower selector list: only the actual NodeBB alert / toast
-		// containers. [role="alert"] is too generic (NodeBB uses it on
-		// composer previews, form-validation banners, nav hints, etc.) and
-		// previously caused gate-redirect to fire on unrelated UI.
+	function scanAlerts(root) {
 		var nodes = (root || document).querySelectorAll(
-			'.alert-danger, .alert-error, .toast-error, .alert.alert-danger, [data-alert-type="error"]'
+			'.alert-danger, .alert-error, .toast-error, [data-alert-type="error"]'
 		);
-		for (var i = 0; i < nodes.length; i++) inspect(nodes[i]);
+		for (var i = 0; i < nodes.length; i++) inspectAlert(nodes[i]);
 	}
 
-	function wire() {
-		scan();
+	function wireBackup() {
+		scanAlerts();
 		if (window.MutationObserver && document.body) {
 			var obs = new MutationObserver(function (muts) {
 				for (var i = 0; i < muts.length; i++) {
@@ -74,12 +140,12 @@
 						for (var j = 0; j < m.addedNodes.length; j++) {
 							var n = m.addedNodes[j];
 							if (n.nodeType !== 1) continue;
-							inspect(n);
+							inspectAlert(n);
 							if (n.querySelectorAll) {
 								var kids = n.querySelectorAll(
-									'.alert-danger, .alert-error, .toast-error, .alert.alert-danger, [data-alert-type="error"]'
+									'.alert-danger, .alert-error, .toast-error, [data-alert-type="error"]'
 								);
-								for (var k = 0; k < kids.length; k++) inspect(kids[k]);
+								for (var k = 0; k < kids.length; k++) inspectAlert(kids[k]);
 							}
 						}
 					}
@@ -90,8 +156,8 @@
 	}
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', wire);
+		document.addEventListener('DOMContentLoaded', wireBackup);
 	} else {
-		wire();
+		wireBackup();
 	}
 })();
