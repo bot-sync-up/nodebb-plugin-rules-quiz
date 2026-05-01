@@ -13,7 +13,8 @@
   ],
   "scripts": [
     "static/lib/quiz.js",
-    "static/lib/gate-redirect.js"
+    "static/lib/gate-redirect.js",
+    "static/lib/status-badge.js"
   ],
   "acpScripts": [
     "static/lib/admin.js"
