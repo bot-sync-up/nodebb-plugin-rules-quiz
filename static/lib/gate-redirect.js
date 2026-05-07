@@ -32,9 +32,40 @@
 		return window.location.pathname + (window.location.search || '');
 	}
 
+	// Pull the composer's current title + body so we can stash them in
+	// localStorage before navigating away; nodebb-plugin-composer-default's
+	// own draft saver doesn't always cover NEW-topic state, leading to
+	// users typing a title + body, getting bounced to the quiz, and coming
+	// back to an empty composer.
+	function captureComposerDraft() {
+		var composer = document.querySelector('[component="composer"], .composer');
+		if (!composer) return null;
+		var titleEl = composer.querySelector('input[name="title"]');
+		var bodyEl = composer.querySelector('textarea[component="composer/textarea"], textarea.write');
+		var draft = {
+			title: titleEl ? titleEl.value : '',
+			body: bodyEl ? bodyEl.value : '',
+			cid: composer.dataset && composer.dataset.cid,
+			tid: composer.dataset && composer.dataset.tid,
+			at: Date.now(),
+		};
+		if (!draft.title && !draft.body) return null;
+		return draft;
+	}
+
+	function saveDraft(draft) {
+		if (!draft) return;
+		try {
+			var key = draft.tid ? ('rqDraft:reply:' + draft.tid) : ('rqDraft:topic:' + (draft.cid || 'X'));
+			localStorage.setItem(key, JSON.stringify(draft));
+		} catch (_) { /* noop */ }
+	}
+
 	function redirect(mode) {
 		var returnTo = currentReturnTo();
 		try { sessionStorage.setItem('rqReturnTo', returnTo); } catch (_) { /* noop */ }
+		// Save whatever the user has typed BEFORE we navigate away.
+		saveDraft(captureComposerDraft());
 		window.location.href = '/quiz?mode=' + encodeURIComponent(mode)
 			+ '&returnTo=' + encodeURIComponent(returnTo);
 	}
