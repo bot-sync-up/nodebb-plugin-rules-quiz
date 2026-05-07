@@ -252,6 +252,17 @@ async function guardKind(kind, data) {
     return data;
   }
 
+  // Topic-creation cross-gate: when NodeBB creates a new topic, it fires
+  // BOTH filter:topic.create (our topic gate) AND filter:post.shouldQueue
+  // (our post gate, for the topic's first post). The second one would
+  // demand a post token the user doesn't have. Skip the post gate when
+  // we just consumed the topic gate within the last 10s — same user,
+  // same logical action.
+  if (kind === 'post' && hasRecentGatePass(uid, 'topic')) {
+    winston.info('[rules-quiz] post gate SKIPPED uid=' + uid + ' (covered by recent topic-gate pass)');
+    return data;
+  }
+
   if (hasToken) {
     // Mark in-memory grace BEFORE the DB write so the racing hook sees it
     // synchronously even if its state read is already in-flight.
