@@ -724,7 +724,10 @@ define('forum/plugins/rules-quiz', [
 					? ' <a href="' + esc(pq.ruleLinkUrl) + '" target="_blank" rel="noopener" class="rq-pq-rulelink">🔗 לחוק</a>'
 					: '';
 
-				return '<details class="rq-pq ' + statusClass + '"' + (pq.correct ? '' : ' open') + '>'
+				// Always auto-expand the breakdown so users see explanations
+				// without having to click each row open. Was previously open
+				// only for wrong answers.
+				return '<details class="rq-pq ' + statusClass + '" open>'
 					+ '<summary><span class="rq-pq-icon">' + statusIcon + '</span>'
 					+ '<span class="rq-pq-num">' + num + '.</span>'
 					+ '<span class="rq-pq-title">' + title + '</span></summary>'

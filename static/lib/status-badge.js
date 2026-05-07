@@ -88,7 +88,7 @@
 		// Posts
 		var pg = status.postGate || {};
 		if (pg.limit > 0) {
-			setText(el, '[data-rq-posts]', pg.postsCreated + ' / ' + pg.limit,
+			setText(el, '[data-rq-posts]', '⁨' + pg.postsCreated + ' / ' + pg.limit + '⁩',
 				pg.postsCreated >= pg.limit ? 'rq-sb-pass' : '');
 		} else {
 			setText(el, '[data-rq-posts]', 'ללא הגבלה', 'rq-sb-pass');
@@ -96,7 +96,7 @@
 		// Topics
 		var tg = status.topicGate || {};
 		if (tg.limit > 0) {
-			setText(el, '[data-rq-topics]', tg.topicsCreated + ' / ' + tg.limit,
+			setText(el, '[data-rq-topics]', '⁨' + tg.topicsCreated + ' / ' + tg.limit + '⁩',
 				tg.topicsCreated >= tg.limit ? 'rq-sb-pass' : '');
 		} else {
 			setText(el, '[data-rq-topics]', 'ללא הגבלה', 'rq-sb-pass');
