@@ -323,10 +323,18 @@ plugin.guardShouldQueue = async function (payload) {
     const uid = payload && payload.uid;
     if (!uid) return payload;
     const d = payload.data || {};
-    // Distinguish topic vs reply: new topics have `cid` + `title` and no `tid`;
-    // replies have a `tid`. If we can't tell, assume reply (post gate, the
-    // smaller / more common case).
-    const kind = (d.cid && d.title && !d.tid) ? 'topic' : 'post';
+    // New-topic vs reply detection. A new topic ALWAYS carries a non-empty
+    // string `title`; a reply NEVER does. Older logic also required `cid`
+    // and the absence of `tid`, but in the live NodeBB flow `tid` may be
+    // assigned mid-pipeline (when `posts.shouldQueue` is called from
+    // inside `Topics.post` after `Topics.create` has already materialised
+    // the topic id). The title check is the only signal that's stable.
+    const looksLikeTopic = !!(d && typeof d.title === 'string' && d.title.trim().length > 0);
+    const kind = looksLikeTopic ? 'topic' : 'post';
+    winston.info('[rules-quiz] guardShouldQueue uid=' + uid + ' kind=' + kind
+      + ' title=' + (d.title ? JSON.stringify(d.title).slice(0, 60) : '(none)')
+      + ' tid=' + (d.tid || '-') + ' cid=' + (d.cid || '-')
+      + ' payloadType=' + (payload.type || '-'));
     await guardKind(kind, { uid: uid, data: d });
     return payload;
   } catch (e) {
@@ -345,9 +353,14 @@ plugin.guardQueued = async function (payload) {
   try {
     const uid = payload && payload.uid;
     if (!uid) return payload;
-    const type = payload && payload.type;  // 'reply' | 'topic'
-    const kind = type === 'topic' ? 'topic' : 'post';
     const d = payload.data || {};
+    const type = payload && payload.type;  // 'reply' | 'topic'
+    // Prefer the explicit `type` field set by NodeBB, but fall back to
+    // title-presence so we don't miss new-topic creations whose payload
+    // shape varies between NodeBB versions.
+    const looksLikeTopic = type === 'topic' || !!(typeof d.title === 'string' && d.title.trim().length > 0);
+    const kind = looksLikeTopic ? 'topic' : 'post';
+    winston.info('[rules-quiz] guardQueued uid=' + uid + ' kind=' + kind + ' type=' + (type || '-'));
     await guardKind(kind, { uid: uid, data: d });
     return payload;
   } catch (e) {
