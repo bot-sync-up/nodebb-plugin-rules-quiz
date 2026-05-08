@@ -93,12 +93,16 @@
 			|| submitEl.closest('[data-cid],[data-tid]')
 			|| document.querySelector('[component="composer"]');
 		if (!composer) return 'post'; // safe default
-		// PRIMARY signal: a visible title input means this is a NEW TOPIC.
-		// Replies never have a title input. We do this check first because
-		// NodeBB sets data-tid="0" on the new-topic composer in some themes,
-		// which used to trip the dataset check below into returning 'post'.
-		var titleInput = composer.querySelector('input[name="title"]');
-		if (titleInput && titleInput.offsetParent !== null) return 'topic';
+		// PRIMARY signal: ANY title input in the composer means this is a
+		// NEW TOPIC. Replies never have a title input. We don't check
+		// `offsetParent !== null` anymore because NodeBB themes (e.g.
+		// Harmony) wrap the title in a column whose computed-style flow
+		// can make offsetParent null while still being visible. Pure
+		// existence is sufficient.
+		var titleInput = composer.querySelector('input[name="title"]')
+			|| composer.querySelector('input.title')
+			|| composer.querySelector('[component="composer/title"]');
+		if (titleInput) return 'topic';
 		// Secondary: tid > 0 means a real reply target.
 		var tid = composer.dataset && composer.dataset.tid;
 		if (tid && tid !== '0') return 'post';
