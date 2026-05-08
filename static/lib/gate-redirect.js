@@ -40,11 +40,18 @@
 	function captureComposerDraft() {
 		var composer = document.querySelector('[component="composer"], .composer');
 		if (!composer) return null;
-		var titleEl = composer.querySelector('input[name="title"]');
-		var bodyEl = composer.querySelector('textarea[component="composer/textarea"], textarea.write');
+		// Title — try a few common selectors NodeBB themes use.
+		var titleEl = composer.querySelector('input[name="title"]')
+			|| composer.querySelector('input.title')
+			|| composer.querySelector('[component="composer/title"]');
+		// Body — likewise.
+		var bodyEl = composer.querySelector('textarea[component="composer/textarea"]')
+			|| composer.querySelector('textarea.write')
+			|| composer.querySelector('textarea[name="content"]')
+			|| composer.querySelector('textarea');
 		var draft = {
-			title: titleEl ? titleEl.value : '',
-			body: bodyEl ? bodyEl.value : '',
+			title: (titleEl && titleEl.value) || '',
+			body: (bodyEl && bodyEl.value) || '',
 			cid: composer.dataset && composer.dataset.cid,
 			tid: composer.dataset && composer.dataset.tid,
 			at: Date.now(),
@@ -86,12 +93,17 @@
 			|| submitEl.closest('[data-cid],[data-tid]')
 			|| document.querySelector('[component="composer"]');
 		if (!composer) return 'post'; // safe default
-		// Topic creation has cid + title input, no tid.
-		if (composer.dataset && composer.dataset.tid) return 'post';
-		if (composer.dataset && composer.dataset.cid && !composer.dataset.tid) return 'topic';
-		// Fallback: look for a topic title input visible in the composer
+		// PRIMARY signal: a visible title input means this is a NEW TOPIC.
+		// Replies never have a title input. We do this check first because
+		// NodeBB sets data-tid="0" on the new-topic composer in some themes,
+		// which used to trip the dataset check below into returning 'post'.
 		var titleInput = composer.querySelector('input[name="title"]');
 		if (titleInput && titleInput.offsetParent !== null) return 'topic';
+		// Secondary: tid > 0 means a real reply target.
+		var tid = composer.dataset && composer.dataset.tid;
+		if (tid && tid !== '0') return 'post';
+		// Tertiary: cid without tid is also a topic-creation signal.
+		if (composer.dataset && composer.dataset.cid && (!tid || tid === '0')) return 'topic';
 		return 'post';
 	}
 
