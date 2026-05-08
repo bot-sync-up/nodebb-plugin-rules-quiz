@@ -73,6 +73,9 @@
 		try { sessionStorage.setItem('rqReturnTo', returnTo); } catch (_) { /* noop */ }
 		// Save whatever the user has typed BEFORE we navigate away.
 		saveDraft(captureComposerDraft());
+		// Hint draft-restore.js to auto-reopen the composer after the user
+		// passes the quiz and lands back here.
+		try { sessionStorage.setItem('rqAutoOpenComposer', mode); } catch (_) { /* noop */ }
 		window.location.href = '/quiz?mode=' + encodeURIComponent(mode)
 			+ '&returnTo=' + encodeURIComponent(returnTo);
 	}

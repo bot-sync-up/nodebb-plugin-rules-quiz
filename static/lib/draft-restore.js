@@ -96,9 +96,47 @@
 		}, 250);
 	}
 
+	// Programmatically open the composer if we just came back from a quiz
+	// pass (gate-redirect set sessionStorage.rqAutoOpenComposer = 'post' |
+	// 'topic'). For 'topic', click the New-Topic button on the category
+	// page; for 'post', click a Reply button on the topic page.
+	function autoOpenIfRequested() {
+		var mode = '';
+		try { mode = sessionStorage.getItem('rqAutoOpenComposer') || ''; } catch (_) { /* noop */ }
+		if (!mode) return;
+		try { sessionStorage.removeItem('rqAutoOpenComposer'); } catch (_) { /* noop */ }
+		var clicker = function () {
+			var btn = null;
+			if (mode === 'topic') {
+				btn = document.querySelector('[component="category/post"]')
+					|| document.querySelector('[data-action="newtopic"]')
+					|| document.querySelector('.btn-new-topic');
+			} else {
+				btn = document.querySelector('[component="topic/reply"]')
+					|| document.querySelector('[component="post/reply"]')
+					|| document.querySelector('[data-action="reply"]');
+			}
+			if (btn) {
+				btn.click();
+				return true;
+			}
+			return false;
+		};
+		// The button may not be in the DOM yet on slow page loads.
+		// Try a few times with a short delay.
+		var attempts = 0;
+		var iv = setInterval(function () {
+			attempts++;
+			if (clicker() || attempts > 12) clearInterval(iv);
+		}, 250);
+	}
+
 	function init() {
 		// Catch composers already in the DOM at page load.
 		document.querySelectorAll('[component="composer"], .composer').forEach(tryRestore);
+		// Also try to re-open the composer if we were redirected here
+		// from a passing quiz.
+		autoOpenIfRequested();
 		// Catch composers added later via ajaxify / composer-default.
 		if (window.MutationObserver && document.body) {
 			var obs = new MutationObserver(function (muts) {
