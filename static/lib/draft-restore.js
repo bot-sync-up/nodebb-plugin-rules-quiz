@@ -18,7 +18,7 @@
 	if (window.__rqDraftRestoreV7) return;
 	window.__rqDraftRestoreV7 = true;
 
-	var STALE_MS = 30 * 60 * 1000; // 30 minutes — drafts older than this expire
+	var STALE_MS = 5 * 60 * 1000; // 5 minutes — drafts older than this expire
 
 	function readDraftFor(composer) {
 		var ds = composer.dataset || {};
@@ -80,20 +80,42 @@
 		if (!composer || composer.__rqDraftSeen) return;
 		var found = readDraftFor(composer);
 		if (!found) return;
+		// Mark and CLEAN the localStorage key right away. The key has
+		// been "claimed" by this composer instance; if applyDraft below
+		// ends up not changing anything (because NodeBB's own draft
+		// restore got there first and populated the inputs), we still
+		// don't want a stale key sitting around to mis-restore into a
+		// later composer. Single-use semantics.
+		composer.__rqDraftSeen = true;
+		try { localStorage.removeItem(found.key); } catch (_) { /* noop */ }
 		// The composer might be opening but its inputs haven't materialised
-		// yet. Try a few times with a short delay before giving up.
+		// yet. Apply repeatedly until something sticks or we give up.
 		var attempts = 0;
 		var iv = setInterval(function () {
 			attempts++;
 			var changed = applyDraft(composer, found.draft);
-			if (changed || attempts > 8) {
-				clearInterval(iv);
-				if (changed) {
-					try { localStorage.removeItem(found.key); } catch (_) { /* noop */ }
-					composer.__rqDraftSeen = true;
-				}
-			}
+			if (changed || attempts > 8) clearInterval(iv);
 		}, 250);
+	}
+
+	// Sweep stale rqDraft:* keys on page load. A draft older than 5 min
+	// is almost certainly leftover from a prior session.
+	function sweepStaleDrafts() {
+		try {
+			var now = Date.now();
+			var toRemove = [];
+			for (var i = 0; i < localStorage.length; i++) {
+				var k = localStorage.key(i);
+				if (!k || k.indexOf('rqDraft:') !== 0) continue;
+				try {
+					var v = JSON.parse(localStorage.getItem(k) || '{}');
+					if (!v.at || (now - v.at) > 5 * 60 * 1000) toRemove.push(k);
+				} catch (_) { toRemove.push(k); }
+			}
+			for (var j = 0; j < toRemove.length; j++) {
+				localStorage.removeItem(toRemove[j]);
+			}
+		} catch (_) { /* noop */ }
 	}
 
 	// Programmatically open the composer if we just came back from a quiz
@@ -132,6 +154,9 @@
 	}
 
 	function init() {
+		// Sweep any stale drafts (>5min old) from previous sessions before
+		// we start matching against the current page.
+		sweepStaleDrafts();
 		// Catch composers already in the DOM at page load.
 		document.querySelectorAll('[component="composer"], .composer').forEach(tryRestore);
 		// Also try to re-open the composer if we were redirected here
