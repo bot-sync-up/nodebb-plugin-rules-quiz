@@ -438,9 +438,10 @@ define('forum/plugins/rules-quiz', [
 
 		const parts = [];
 		parts.push('<h2 class="rq-question-title">' + esc(q.title) + '</h2>');
-		if (q.bodyHtml) {
-			parts.push('<div class="rq-question-body">' + q.bodyHtml + '</div>');
-		} else if (q.bodyMarkdown) {
+		// `q.bodyHtml` was a latent XSS sink (server never sets it, but the
+		// raw-innerHTML branch was loaded). Removed to harden against any
+		// future code path that might supply it. Body always renders escaped.
+		if (q.bodyMarkdown) {
 			parts.push('<pre class="rq-question-body rq-question-body--plain">' + esc(q.bodyMarkdown) + '</pre>');
 		}
 		if (q.imageUrl) {
@@ -694,9 +695,12 @@ define('forum/plugins/rules-quiz', [
 			heading = rq.failed;
 			if (total === 0) {
 				icon = '⚠️';
-				msg = 'משהו השתבש בטעינת השאלות. אנא רענן את הדף ונסה שוב.';
+				msg = '[[rulesquiz:error.network]]';
 			} else {
-				msg = 'ענית נכון על ' + score + ' מתוך ' + total + ' שאלות. דרוש ' + passPercent + '% כדי לעבור.';
+				// Use the existing result.score i18n key (both en-GB and he
+				// already define it with %1 / %2 positional args). Avoids
+				// hardcoded Hebrew that breaks for English users.
+				msg = '[[rulesquiz:result.score, ' + score + ', ' + total + ']]';
 			}
 			if (resp.reason === 'locked' || mode === 'lock_after_attempts') {
 				icon = '🔒'; showRetry = false;
