@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-rules-quiz",
-  "version": "0.7.7",
+  "version": "0.7.8",
   "description": "Gates new (and optionally existing) NodeBB users behind a configurable forum-rules quiz before they can post.",
   "main": "library.js",
   "repository": {
@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/bot-sync-up/nodebb-plugin-rules-quiz#readme",
   "nbbpm": {
-    "compatibility": "^2.0.0 || ^3.0.0 || ^4.0.0"
+    "compatibility": "^2.6.0 || ^3.0.0 || ^4.0.0"
   },
   "dependencies": {
     "csv-parse": "^5.5.0",

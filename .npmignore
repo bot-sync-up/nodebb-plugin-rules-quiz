@@ -1,0 +1,23 @@
+# Internal docs / dev-only files — never publish to npm.
+SPEC.md
+DEBUG.md
+_ssh_*.py
+_fill_*.js
+.git/
+.github/
+.vscode/
+.idea/
+*.log
+node_modules/
+coverage/
+test/
+tests/
+__tests__/
+
+# Build artefacts
+dist/
+build/
+
+# OS junk
+.DS_Store
+Thumbs.db

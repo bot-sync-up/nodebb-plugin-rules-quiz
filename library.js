@@ -371,21 +371,37 @@ plugin.guardQueued = async function (payload) {
 };
 
 async function getMinimalUser(uid) {
-  try {
-    const user = require.main.require('./src/user');
-    const groups = require.main.require('./src/groups');
-    const [data, userGroups, reputation, joindate] = await Promise.all([
-      user.getUserFields(uid, ['uid', 'username', 'reputation', 'joindate']),
-      groups.getUserGroups([uid]).then(arr => (arr && arr[0]) || []),
-      Promise.resolve(),
-      Promise.resolve(),
-    ]);
-    return Object.assign({}, data, {
-      groups: (userGroups || []).map(g => g && g.name).filter(Boolean),
-    });
-  } catch (e) {
-    return { uid };
+  // Be defensive: each of the three lookups can throw independently
+  // (e.g., DB blip, NodeBB API change). Returning {uid} with no groups
+  // used to make admins fail-CLOSED — they'd lose group-based exemption
+  // and get blocked by their own gate. We try each lookup individually,
+  // also consult isAdministrator/isGlobalMod directly so we never lose
+  // staff exemption due to a groups-lookup failure.
+  const user = (() => { try { return require.main.require('./src/user'); } catch (e) { return null; } })();
+  const groups = (() => { try { return require.main.require('./src/groups'); } catch (e) { return null; } })();
+  let data = {};
+  let groupNames = [];
+  if (user) {
+    try { data = await user.getUserFields(uid, ['uid', 'username', 'reputation', 'joindate']) || {}; } catch (_) { /* keep {} */ }
+    try {
+      const isAdmin = await user.isAdministrator(uid);
+      if (isAdmin) groupNames.push('administrators');
+    } catch (_) { /* noop */ }
+    try {
+      if (typeof user.isGlobalModerator === 'function') {
+        const isMod = await user.isGlobalModerator(uid);
+        if (isMod) groupNames.push('Global Moderators');
+      }
+    } catch (_) { /* noop */ }
   }
+  if (groups) {
+    try {
+      const arr = await groups.getUserGroups([uid]);
+      const list = (arr && arr[0]) || [];
+      list.forEach((g) => { if (g && g.name && groupNames.indexOf(g.name) === -1) groupNames.push(g.name); });
+    } catch (_) { /* keep what we have */ }
+  }
+  return Object.assign({}, data, { uid: uid, groups: groupNames });
 }
 
 module.exports = plugin;
