@@ -60,6 +60,9 @@
 			|| composer.querySelector('textarea.write')
 			|| composer.querySelector('textarea[name="content"]')
 			|| composer.querySelector('textarea');
+		// Quill rich-text composer (nodebb-plugin-composer-quill) uses a
+		// contenteditable div, not a textarea.
+		var quillEl = composer.querySelector('.ql-editor');
 		var changed = false;
 		if (titleEl && draft.title && !titleEl.value) {
 			titleEl.value = draft.title;
@@ -72,6 +75,18 @@
 			bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
 			bodyEl.dispatchEvent(new Event('change', { bubbles: true }));
 			changed = true;
+		} else if (!bodyEl && quillEl && draft.body) {
+			var existing = (quillEl.textContent || '').trim();
+			if (!existing) {
+				// Insert as a paragraph so Quill picks it up. Use textContent
+				// to avoid injecting HTML (XSS-safe).
+				var p = document.createElement('p');
+				p.textContent = draft.body;
+				quillEl.innerHTML = '';
+				quillEl.appendChild(p);
+				quillEl.dispatchEvent(new Event('input', { bubbles: true }));
+				changed = true;
+			}
 		}
 		return changed;
 	}
