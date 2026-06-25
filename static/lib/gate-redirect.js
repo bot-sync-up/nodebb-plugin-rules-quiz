@@ -49,9 +49,12 @@
 			|| composer.querySelector('textarea.write')
 			|| composer.querySelector('textarea[name="content"]')
 			|| composer.querySelector('textarea');
+		// Quill rich-text composer stores body in a contenteditable div.
+		var quillEl = composer.querySelector('.ql-editor');
+		var body = (bodyEl && bodyEl.value) || (quillEl ? (quillEl.textContent || '').trim() : '');
 		var draft = {
 			title: (titleEl && titleEl.value) || '',
-			body: (bodyEl && bodyEl.value) || '',
+			body: body,
 			cid: composer.dataset && composer.dataset.cid,
 			tid: composer.dataset && composer.dataset.tid,
 			at: Date.now(),

@@ -1,8 +1,11 @@
 {
   "name": "nodebb-plugin-rules-quiz",
-  "version": "0.7.9",
+  "version": "0.8.0",
   "description": "Gates new (and optionally existing) NodeBB users behind a configurable forum-rules quiz before they can post.",
   "main": "library.js",
+  "scripts": {
+    "test": "node test/policy.test.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bot-sync-up/nodebb-plugin-rules-quiz.git"

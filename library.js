@@ -161,8 +161,10 @@ plugin.gate = async function (data) {
     if (!settings.enabled) return data;
 
     if (policy.isPathExempt(req.path || req.url, settings)) return data;
-    if (settings.blockMode === 'block_write' || settings.blockMode === 'modal_soft') return data;
-    // block_all only redirects on every request
+    // The page-level gate redirect only fires for 'block_all'. In
+    // 'block_write' (and legacy 'modal_soft', now equivalent) the user can
+    // browse freely and is blocked only at write time by guardKind.
+    if (settings.blockMode !== 'block_all') return data;
 
     const state = await db.getUserState(req.uid);
     if (!state || state.status === 'passed' || state.status === 'exempt') return data;
@@ -198,7 +200,9 @@ async function guardKind(kind, data) {
 
   const settings = await db.getSettings();
   if (!settings.enabled) return data;
-  if (settings.blockMode === 'modal_soft') return data;
+  // 'modal_soft' was a no-op mode (it blocked nothing) — removed from the
+  // ACP in v0.8.0. Any stored value now behaves like 'block_write' so the
+  // gate actually enforces. 'block_all' also blocks writes.
 
   const user = await getMinimalUser(uid);
   if (policy.isExempt(user, settings)) return data;

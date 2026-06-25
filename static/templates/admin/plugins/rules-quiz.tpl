@@ -66,7 +66,6 @@
 					<div class="form-group rq-row">
 						<label for="rq-blockMode">[[rulesquiz:admin.field.blockMode]]</label>
 						<select class="form-control" id="rq-blockMode" data-field="blockMode">
-							<option value="modal_soft">[[rulesquiz:admin.opt.modal_soft]]</option>
 							<option value="block_write">[[rulesquiz:admin.opt.block_write]]</option>
 							<option value="block_all">[[rulesquiz:admin.opt.block_all]]</option>
 						</select>
@@ -110,6 +109,10 @@
 					<div class="form-group rq-row">
 						<label for="rq-exemptGroups">[[rulesquiz:admin.field.exemptGroups]]</label>
 						<input type="text" class="form-control" id="rq-exemptGroups" data-field="exemptGroups" data-type="csv" placeholder="administrators, Global Moderators">
+					</div>
+					<div class="form-group rq-row">
+						<label for="rq-exemptMinReputation">[[rulesquiz:admin.field.exemptMinReputation]]</label>
+						<input type="number" min="0" class="form-control" id="rq-exemptMinReputation" data-field="exemptMinReputation" data-type="numberOrNull" placeholder="0 = disabled">
 					</div>
 					<div class="form-group rq-row">
 						<label for="rq-exemptPaths">[[rulesquiz:admin.field.exemptPaths]]</label>
