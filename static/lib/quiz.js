@@ -681,6 +681,11 @@ define('forum/plugins/rules-quiz', [
 				msg = '[[rulesquiz:error.cooldown]]';
 				showCooldown = true;
 				cooldownMs = Number(resp.retryAfterMs || 0);
+			} else if (resp.reason === 'rate_limited') {
+				heading = '[[rulesquiz:result.cooldown_remaining]]';
+				msg = '[[rulesquiz:error.rate_limited]]';
+				showCooldown = true;
+				cooldownMs = Number(resp.retryAfterMs || 0);
 			} else {
 				heading = rq.failed;
 				msg = '[[rulesquiz:error.network]]';

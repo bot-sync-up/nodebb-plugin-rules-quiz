@@ -61,6 +61,7 @@
 #rulesquiz-app .rq-result{text-align:center;padding:1rem 0}
 #rulesquiz-app .rq-result-icon{font-size:4.5rem;line-height:1;margin:.5rem 0 1rem;display:inline-block;animation:rq-pop .5s ease}
 @keyframes rq-pop{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){#rulesquiz-app *,#rulesquiz-app *::before,#rulesquiz-app *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
 #rulesquiz-app .rq-result h2{font-size:1.9em;margin:0 0 .5rem;font-weight:700}
 #rulesquiz-app .rq-result-passed h2{color:#16a34a}
 #rulesquiz-app .rq-result-failed h2{color:#dc2626}
@@ -159,8 +160,8 @@
 				<div id="rq-gate-progress" class="rq-gate-progress" hidden></div>
 				<h1 class="rq-heading">[[rulesquiz:title]]</h1>
 				<div class="rq-quiz-meta">
-					<span id="rq-timer" class="rq-timer" hidden></span>
-					<span id="rq-progress-text" class="rq-progress-text"></span>
+					<span id="rq-timer" class="rq-timer" role="timer" aria-live="polite" aria-atomic="true" hidden></span>
+					<span id="rq-progress-text" class="rq-progress-text" aria-live="polite" aria-atomic="true"></span>
 				</div>
 				<div class="rq-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
 					<div id="rq-progress-bar" class="rq-progress-bar"></div>
