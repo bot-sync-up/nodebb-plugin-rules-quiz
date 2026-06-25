@@ -267,14 +267,18 @@ async function guardKind(kind, data) {
     // Mark in-memory grace BEFORE the DB write so the racing hook sees it
     // synchronously even if its state read is already in-flight.
     rememberGatePass(uid, kind);
-    // Consume (single-use) + increment the kind counter + leave a DB trail.
-    const nextState = {};
-    nextState[countField] = already + 1;
-    nextState[dbField] = 0;
-    nextState.lastGateAt = now;
-    nextState.lastGateKind = kind;
-    await db.setUserState(uid, nextState);
-    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' count=' + (already + 1) + '/' + limit);
+    // Atomically increment the counter (race-safe) and clear the consumed
+    // token + leave a grace trail via partial-field writes (also race-safe
+    // now that setUserState only touches the fields it's given).
+    let newCount = already + 1;
+    try {
+      newCount = await db.incrUserField(uid, countField, 1);
+    } catch (_) {
+      // Fallback to the non-atomic path if incr isn't available.
+      await db.setUserState(uid, { [countField]: already + 1 });
+    }
+    await db.setUserState(uid, { [dbField]: 0, lastGateAt: now, lastGateKind: kind });
+    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' count=' + newCount + '/' + limit);
     return data;
   }
 
