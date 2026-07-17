@@ -325,7 +325,6 @@
 						<label for="rq-pool-mode">[[rulesquiz:admin.field.poolMode]]</label>
 						<select class="form-control" id="rq-pool-mode" data-field="pool.mode">
 							<option value="single_tagged">[[rulesquiz:admin.opt.pool_single_tagged]]</option>
-							<option value="separate">[[rulesquiz:admin.opt.pool_separate]]</option>
 						</select>
 						<small class="form-text text-muted">[[rulesquiz:admin.help.poolMode]]</small>
 					</div>

@@ -75,11 +75,14 @@
 			bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
 			bodyEl.dispatchEvent(new Event('change', { bubbles: true }));
 			changed = true;
-		} else if (!bodyEl && quillEl && draft.body) {
+		}
+		// Quill keeps a SYNCED hidden textarea, so bodyEl is usually truthy;
+		// setting textarea.value alone does NOT update the visible contenteditable.
+		// Populate the .ql-editor too whenever it's empty (independent of the
+		// textarea branch). textContent, never innerHTML → XSS-safe.
+		if (quillEl && draft.body) {
 			var existing = (quillEl.textContent || '').trim();
 			if (!existing) {
-				// Insert as a paragraph so Quill picks it up. Use textContent
-				// to avoid injecting HTML (XSS-safe).
 				var p = document.createElement('p');
 				p.textContent = draft.body;
 				quillEl.innerHTML = '';

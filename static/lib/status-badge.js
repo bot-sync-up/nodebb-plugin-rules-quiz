@@ -128,8 +128,16 @@
 		var el = buildEl();
 		document.body.appendChild(el);
 		fetchAndRender(el);
-		// Refresh every 30s so the user sees state changes after a post.
-		var iv = setInterval(function () { fetchAndRender(el); }, 30000);
+		// Refresh every 30s so the user sees state changes after a post —
+		// but skip the poll while the tab is hidden to avoid hammering
+		// /gate-status on backgrounded tabs. Refresh once on re-focus.
+		var iv = setInterval(function () {
+			if (document.hidden) return;
+			fetchAndRender(el);
+		}, 30000);
+		document.addEventListener('visibilitychange', function () {
+			if (!document.hidden && !el.hidden) fetchAndRender(el);
+		});
 		el.addEventListener('click', function (e) {
 			var t = e.target;
 			if (t.classList && t.classList.contains('rq-sb-close')) {
