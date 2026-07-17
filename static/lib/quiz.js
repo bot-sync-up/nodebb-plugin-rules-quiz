@@ -390,6 +390,14 @@ define('forum/plugins/rules-quiz', [
 			.replace(/'/g, '&#39;');
 	}
 
+	// Escape a URL for an href/src, allowing only safe schemes. Blocks
+	// javascript:/data:/vbscript: etc. that an admin question could carry.
+	function safeUrl(u) {
+		var s = String(u == null ? '' : u).trim();
+		if (/^(https?:\/\/|\/|#|mailto:)/i.test(s)) return esc(s);
+		return '#';
+	}
+
 	/**
 	 * Render the current question into `#rq-question` and update the
 	 * progress bar / footer button visibility.
@@ -445,10 +453,10 @@ define('forum/plugins/rules-quiz', [
 			parts.push('<pre class="rq-question-body rq-question-body--plain">' + esc(q.bodyMarkdown) + '</pre>');
 		}
 		if (q.imageUrl) {
-			parts.push('<img class="rq-question-image" src="' + esc(q.imageUrl) + '" alt="" />');
+			parts.push('<img class="rq-question-image" src="' + safeUrl(q.imageUrl) + '" alt="" />');
 		}
 		if (q.ruleLinkUrl) {
-			parts.push('<p class="rq-question-rulelink"><a href="' + esc(q.ruleLinkUrl) + '" target="_blank" rel="noopener">' + esc(q.ruleLinkUrl) + '</a></p>');
+			parts.push('<p class="rq-question-rulelink"><a href="' + safeUrl(q.ruleLinkUrl) + '" target="_blank" rel="noopener">' + esc(q.ruleLinkUrl) + '</a></p>');
 		}
 
 		const inputName = 'rq-q-' + esc(String(q.qid));
@@ -677,15 +685,17 @@ define('forum/plugins/rules-quiz', [
 				heading = '[[rulesquiz:result.daily_limit_message]]';
 				msg = '[[rulesquiz:error.daily_limit]]';
 			} else if (resp.reason === 'cooldown') {
-				heading = '[[rulesquiz:result.cooldown_remaining]]';
+				// result.cooldown_remaining has a %1 placeholder — pass the
+				// formatted duration so the heading doesn't render "…%1".
+				cooldownMs = Number(resp.retryAfterMs || 0);
+				heading = '[[rulesquiz:result.cooldown_remaining, ' + esc(formatCooldown(cooldownMs)) + ']]';
 				msg = '[[rulesquiz:error.cooldown]]';
 				showCooldown = true;
-				cooldownMs = Number(resp.retryAfterMs || 0);
 			} else if (resp.reason === 'rate_limited') {
-				heading = '[[rulesquiz:result.cooldown_remaining]]';
+				cooldownMs = Number(resp.retryAfterMs || 0);
+				heading = '[[rulesquiz:result.cooldown_remaining, ' + esc(formatCooldown(cooldownMs)) + ']]';
 				msg = '[[rulesquiz:error.rate_limited]]';
 				showCooldown = true;
-				cooldownMs = Number(resp.retryAfterMs || 0);
 			} else {
 				heading = rq.failed;
 				msg = '[[rulesquiz:error.network]]';
@@ -710,8 +720,13 @@ define('forum/plugins/rules-quiz', [
 			if (resp.reason === 'locked' || mode === 'lock_after_attempts') {
 				icon = '🔒'; showRetry = false;
 			} else if (mode === 'cooldown') {
-				showCooldown = true;
 				cooldownMs = ((state.settings && state.settings.onFail && state.settings.onFail.cooldownSec) || 0) * 1000;
+				if (cooldownMs > 0) {
+					showCooldown = true;
+				} else {
+					// cooldownSec is 0/unset — no wait, just let them retry.
+					showRetry = true;
+				}
 			} else {
 				showRetry = true;
 			}
@@ -730,7 +745,7 @@ define('forum/plugins/rules-quiz', [
 				const correctAnswer = pq.correctAnswer ? esc(pq.correctAnswer) : '';
 				const explanation = pq.explanation ? esc(pq.explanation) : '';
 				const ruleLink = pq.ruleLinkUrl
-					? ' <a href="' + esc(pq.ruleLinkUrl) + '" target="_blank" rel="noopener" class="rq-pq-rulelink">🔗 לחוק</a>'
+					? ' <a href="' + safeUrl(pq.ruleLinkUrl) + '" target="_blank" rel="noopener" class="rq-pq-rulelink">🔗 לחוק</a>'
 					: '';
 
 				// Always auto-expand the breakdown so users see explanations

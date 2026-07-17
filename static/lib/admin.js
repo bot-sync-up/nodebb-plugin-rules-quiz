@@ -615,21 +615,27 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 			};
 			fr.readAsText(file);
 		} else {
-			var fd = new FormData();
-			fd.append('file', file);
-			console.log('[rules-quiz/acp] POST import csv', file.name);
-			apiFetch('POST', API_BASE + '/questions/import?format=csv', fd).then(function (resp) {
-				console.log('[rules-quiz/acp] import response', resp);
-				var body = unwrap(resp) || {};
-				var added = body.added || 0;
-				alerts.success('[[rulesquiz:admin.imported]] (' + added + ')');
-				closeImportModal();
-				return loadQuestions();
-			}).catch(function (err) {
-				console.error('[rules-quiz/acp] import failed', err);
-				var msg = err && err.message ? err.message : String(err);
-				alerts.error('[[rulesquiz:admin.error.import]]: ' + msg);
-			});
+			// CSV: read the file client-side and send the raw text as a JSON
+			// body. Avoids needing a multipart/multer upload middleware on the
+			// route (the old FormData path silently no-op'd because req.file
+			// was never populated).
+			var frc = new FileReader();
+			frc.onload = function () {
+				console.log('[rules-quiz/acp] POST import csv', file.name, 'chars', (frc.result || '').length);
+				apiFetch('POST', API_BASE + '/questions/import?format=csv', { format: 'csv', payload: String(frc.result || '') }).then(function (resp) {
+					console.log('[rules-quiz/acp] import response', resp);
+					var body = unwrap(resp) || {};
+					var added = body.added || 0;
+					alerts.success('[[rulesquiz:admin.imported]] (' + added + ')');
+					closeImportModal();
+					return loadQuestions();
+				}).catch(function (err) {
+					console.error('[rules-quiz/acp] import failed', err);
+					var msg = err && err.message ? err.message : String(err);
+					alerts.error('[[rulesquiz:admin.error.import]]: ' + msg);
+				});
+			};
+			frc.readAsText(file);
 		}
 	}
 
@@ -761,13 +767,23 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 
 	function confirmAction(message) {
 		return new Promise(function (resolve) {
-			if (window.bootbox && typeof window.bootbox.confirm === 'function') {
-				try {
-					window.bootbox.confirm(message, function (ok) { resolve(!!ok); });
-					return;
-				} catch (e) { /* fall through */ }
+			// Translate [[rulesquiz:...]] keys before showing — bootbox and
+			// native confirm() do NOT run the translator, so a raw key would
+			// display literally.
+			var show = function (text) {
+				if (window.bootbox && typeof window.bootbox.confirm === 'function') {
+					try {
+						window.bootbox.confirm(text, function (ok) { resolve(!!ok); });
+						return;
+					} catch (e) { /* fall through */ }
+				}
+				resolve(window.confirm(text));
+			};
+			if (translator && typeof translator.translate === 'function') {
+				translator.translate(message, function (translated) { show(translated); });
+			} else {
+				show(message);
 			}
-			resolve(window.confirm(message));
 		});
 	}
 
@@ -879,8 +895,9 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		byGate = byGate || {};
 		['onboarding', 'post', 'topic'].forEach(function (gate) {
 			var row = byGate[gate] || {};
-			$('#rq-gate-' + gate + '-passed').text(row.passed || 0);
-			$('#rq-gate-' + gate + '-failed').text(row.failed || 0);
+			// Server returns {p, f}; accept both shapes.
+			$('#rq-gate-' + gate + '-passed').text(row.p != null ? row.p : (row.passed || 0));
+			$('#rq-gate-' + gate + '-failed').text(row.f != null ? row.f : (row.failed || 0));
 		});
 	}
 
@@ -894,7 +911,7 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 		var html = list.map(function (u) {
 			var uid = u.uid;
 			var username = u.username || ('uid' + uid);
-			var fails = u.failCount || u.fails || 0;
+			var fails = (u.attempts != null) ? u.attempts : (u.failCount || u.fails || 0);
 			return '<li class="list-group-item d-flex justify-content-between align-items-center">' +
 				'<span>' + escapeHtml(username) + ' <small class="text-muted">#' + escapeHtml(uid) + '</small></span>' +
 				'<span>' +

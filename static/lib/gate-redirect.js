@@ -77,10 +77,15 @@
 		// Save whatever the user has typed BEFORE we navigate away.
 		saveDraft(captureComposerDraft());
 		// Hint draft-restore.js to auto-reopen the composer after the user
-		// passes the quiz and lands back here.
-		try { sessionStorage.setItem('rqAutoOpenComposer', mode); } catch (_) { /* noop */ }
-		window.location.href = '/quiz?mode=' + encodeURIComponent(mode)
-			+ '&returnTo=' + encodeURIComponent(returnTo);
+		// passes the quiz and lands back here. The 'onboarding' redirect
+		// carries no ?mode so the quiz page runs the full rules -> intro ->
+		// questions flow; the re-open kind is derived from the last submit.
+		var openKind = (mode === 'topic') ? 'topic' : 'post';
+		try { sessionStorage.setItem('rqAutoOpenComposer', openKind); } catch (_) { /* noop */ }
+		var url = (mode === 'onboarding')
+			? '/quiz?returnTo=' + encodeURIComponent(returnTo)
+			: '/quiz?mode=' + encodeURIComponent(mode) + '&returnTo=' + encodeURIComponent(returnTo);
+		window.location.href = url;
 	}
 
 	function fetchStatus() {
@@ -99,21 +104,21 @@
 			|| submitEl.closest('[data-cid],[data-tid]')
 			|| document.querySelector('[component="composer"]');
 		if (!composer) return 'post'; // safe default
-		// PRIMARY signal: ANY title input in the composer means this is a
-		// NEW TOPIC. Replies never have a title input. We don't check
-		// `offsetParent !== null` anymore because NodeBB themes (e.g.
-		// Harmony) wrap the title in a column whose computed-style flow
-		// can make offsetParent null while still being visible. Pure
-		// existence is sufficient.
+		// PRIMARY signal: a real target topic id (tid > 0) means this is a
+		// REPLY. A new-topic composer has no tid, or tid='0'/'' (Harmony
+		// sets '0'). We check tid NUMERICALLY — the old "any title input =
+		// topic" rule misclassified replies on themes that keep a hidden
+		// title input in the reply composer, sending every reply to the
+		// topic quiz. tid is the unambiguous signal.
+		var tidRaw = (composer.dataset && composer.dataset.tid) || '';
+		var tid = parseInt(tidRaw, 10);
+		if (tid > 0) return 'post';
+		// No real tid → new topic (it will have a cid and/or a title input).
+		if (composer.dataset && composer.dataset.cid) return 'topic';
 		var titleInput = composer.querySelector('input[name="title"]')
 			|| composer.querySelector('input.title')
 			|| composer.querySelector('[component="composer/title"]');
 		if (titleInput) return 'topic';
-		// Secondary: tid > 0 means a real reply target.
-		var tid = composer.dataset && composer.dataset.tid;
-		if (tid && tid !== '0') return 'post';
-		// Tertiary: cid without tid is also a topic-creation signal.
-		if (composer.dataset && composer.dataset.cid && (!tid || tid === '0')) return 'topic';
 		return 'post';
 	}
 
@@ -145,6 +150,14 @@
 		setTimeout(function () {
 			fetchStatus().then(function (status) {
 				if (!status || !status.loggedIn) return;
+				// Onboarding takes precedence: a user who hasn't passed (and
+				// isn't exempt) must do the FULL onboarding quiz, not the
+				// short per-post/topic mini-quiz. Redirect to /quiz with no
+				// mode so decideInitialScreen shows rules -> intro -> quiz.
+				if (!status.onboardingPassed && !status.onboardingExempt) {
+					redirect('onboarding');
+					return;
+				}
 				if (kind === 'topic') {
 					if (status.topicGate && status.topicGate.active && !status.topicGate.hasToken) {
 						redirect('topic');

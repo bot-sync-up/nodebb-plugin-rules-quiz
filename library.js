@@ -42,7 +42,12 @@ function rememberGatePass(uid, kind) {
 }
 function hasRecentGatePass(uid, kind) {
   const t = recentGatePasses.get(uid + ':' + kind) || 0;
-  return t > 0 && (Date.now() - t) < 10000; // 10s grace window
+  // 3s grace window: long enough to cover the multi-hook chain of a SINGLE
+  // write action (filter:post.shouldQueue -> post-queue.save / topic.reply
+  // fire within milliseconds), short enough that a human can't sneak a
+  // second genuine, uncounted write through the grace. Combined with the
+  // 12/min rate limit this bounds any residual bypass to near-zero.
+  return t > 0 && (Date.now() - t) < 3000;
 }
 
 /**

@@ -19,7 +19,9 @@ before unlocking write access.
 - **Markdown + image support** in question bodies; optional explanation shown after each answer.
 - **Per-question deep link** back to the relevant section of your rules thread.
 - **Configurable gate scope:** new users by default, or also existing users filtered by group / reputation / join date.
-- **Three block modes:** soft modal, block writing only, or block all access.
+- **Two block modes:** block writing only (browse freely, gated at post time), or block all access.
+- **Per-reply and per-new-topic gates:** require a fresh mini-quiz before each of the first N replies and the first M new topics (configurable per gate: question count, pass %, cooldown, how many posts/topics).
+- **Reputation exemption:** users at/above a reputation threshold skip all gates.
 - **Pass criteria:** all-or-nothing, percentage threshold, or "X correct out of Y".
 - **Failure handling:** retry, cooldown, daily limit, or lock after N attempts. Admin chooses.
 - **On success:** auto-add the user to a group (e.g. `verified-rules`) + welcome notification.
