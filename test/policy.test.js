@@ -103,6 +103,28 @@ test('scoreAttempt: freetext bad regex does not throw', () => {
   });
 });
 
+// --- needsQuiz install cutoff (v0.8.2) ------------------------------------
+test('needsQuiz: existing user (joined before cutoff) NOT gated as new', () => {
+  const settings = { enabled: true, activatedAt: 1000, appliesTo: { newUsers: true, existingUsers: false } };
+  const user = { uid: 5, joindate: 500, groups: [] }; // joined before install
+  assert.strictEqual(policy.needsQuiz(user, { status: 'pending' }, settings), false);
+});
+test('needsQuiz: new user (joined after cutoff) IS gated', () => {
+  const settings = { enabled: true, activatedAt: 1000, appliesTo: { newUsers: true, existingUsers: false } };
+  const user = { uid: 6, joindate: 2000, groups: [] }; // joined after install
+  assert.strictEqual(policy.needsQuiz(user, { status: 'pending' }, settings), true);
+});
+test('needsQuiz: existingUsers:true gates everyone regardless of cutoff', () => {
+  const settings = { enabled: true, activatedAt: 1000, appliesTo: { newUsers: true, existingUsers: true } };
+  const user = { uid: 7, joindate: 500, groups: [] };
+  assert.strictEqual(policy.needsQuiz(user, { status: 'pending' }, settings), true);
+});
+test('needsQuiz: passed user never gated', () => {
+  const settings = { enabled: true, activatedAt: 1000, appliesTo: { newUsers: true, existingUsers: true } };
+  const user = { uid: 8, joindate: 5000, groups: [] };
+  assert.strictEqual(policy.needsQuiz(user, { status: 'passed' }, settings), false);
+});
+
 // --- canAttempt ------------------------------------------------------------
 test('canAttempt: locked status blocks', () => {
   const r = policy.canAttempt({ status: 'locked' }, { onFail: {} }, Date.now());

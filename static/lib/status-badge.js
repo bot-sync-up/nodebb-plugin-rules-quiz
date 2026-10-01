@@ -124,10 +124,26 @@
 		if (p === '/quiz' || p.indexOf('/admin') === 0) return;
 		// Don't re-show if user closed it this session.
 		try { if (sessionStorage.getItem('rqBadgeHidden') === '1') return; } catch (_) { /* noop */ }
+		// The badge is OFF by default — it only mounts if the admin explicitly
+		// enabled it (settings.showStatusBadge, reflected in gate-status). This
+		// avoids a floating debug box appearing for every user on every page.
+		fetch(STATUS_URL, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+			.then(function (r) { return r.json(); })
+			.then(function (j) {
+				var data = (j && j.response !== undefined) ? j.response : j;
+				if (data && data.loggedIn && data.showBadge) {
+					buildAndWire(data);
+				}
+			})
+			.catch(function () { /* silent — no badge */ });
+	}
+
+	function buildAndWire(initialStatus) {
 		injectStyles();
 		var el = buildEl();
 		document.body.appendChild(el);
-		fetchAndRender(el);
+		// Render the status we already fetched; avoids an immediate 2nd call.
+		if (initialStatus) { render(el, initialStatus); } else { fetchAndRender(el); }
 		// Refresh every 30s so the user sees state changes after a post —
 		// but skip the poll while the tab is hidden to avoid hammering
 		// /gate-status on backgrounded tabs. Refresh once on re-focus.

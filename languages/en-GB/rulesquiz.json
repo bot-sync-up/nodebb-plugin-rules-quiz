@@ -70,6 +70,7 @@
   "admin.field.rulesUrl": "Rules thread URL",
   "admin.field.sampleSize": "Sample size (0 = all)",
   "admin.field.showRulesGate": "Show rules-ack screen",
+  "admin.field.showStatusBadge": "Show floating status badge (debug aid, off by default)",
   "admin.field.shuffleAnswers": "Shuffle answers",
   "admin.field.shuffleQuestions": "Shuffle questions",
   "admin.field.timeLimitSec": "Time limit (seconds, 0 = none)",

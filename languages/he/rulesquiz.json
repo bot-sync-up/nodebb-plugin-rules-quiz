@@ -70,6 +70,7 @@
   "admin.field.rulesUrl": "כתובת אשכול החוקים",
   "admin.field.sampleSize": "גודל מדגם (0 = הכל)",
   "admin.field.showRulesGate": "הצג מסך אישור חוקים",
+  "admin.field.showStatusBadge": "הצג תווית סטטוס צפה (עזר דיבוג, כבוי כברירת מחדל)",
   "admin.field.shuffleAnswers": "ערבב תשובות",
   "admin.field.shuffleQuestions": "ערבב שאלות",
   "admin.field.timeLimitSec": "הגבלת זמן (שניות, 0 = ללא)",

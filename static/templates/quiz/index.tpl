@@ -96,6 +96,32 @@
 #rulesquiz-app .rq-pq-correct-text{color:#166534;font-weight:600;background:#dcfce7;padding:.05rem .5rem;border-radius:6px}
 #rulesquiz-app .rq-pq-explain{margin-top:.6rem;padding:.6rem .8rem;background:rgba(79,124,255,.08);border-inline-start:3px solid #4f7cff;border-radius:6px;color:#334155;line-height:1.55}
 #rulesquiz-app .rq-pq-rulelink{color:#4f7cff;text-decoration:underline;margin-inline-start:.5rem;white-space:nowrap}
+/* ---- Dark mode -------------------------------------------------------
+   NodeBB 4 / Harmony toggles html[data-bs-theme="dark"]; older themes and
+   OS preference use prefers-color-scheme. Cover both so the quiz page isn't
+   a blinding white card on a dark forum. */
+.rq-dark #rulesquiz-app,html[data-bs-theme="dark"] #rulesquiz-app{color:#e2e8f0}
+.rq-dark #rulesquiz-app .rq-card,html[data-bs-theme="dark"] #rulesquiz-app .rq-card{background:#1e293b;border-color:#334155;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.rq-dark #rulesquiz-app .rq-heading,html[data-bs-theme="dark"] #rulesquiz-app .rq-heading,.rq-dark #rulesquiz-app .rq-question-title,html[data-bs-theme="dark"] #rulesquiz-app .rq-question-title{color:#f1f5f9}
+.rq-dark #rulesquiz-app .rq-rules-body,html[data-bs-theme="dark"] #rulesquiz-app .rq-rules-body,.rq-dark #rulesquiz-app .rq-intro-body,html[data-bs-theme="dark"] #rulesquiz-app .rq-intro-body,.rq-dark #rulesquiz-app .rq-checkbox,html[data-bs-theme="dark"] #rulesquiz-app .rq-checkbox{background:#0f172a;border-color:#334155;color:#cbd5e1}
+.rq-dark #rulesquiz-app .rq-option,html[data-bs-theme="dark"] #rulesquiz-app .rq-option{background:#0f172a;border-color:#334155}
+.rq-dark #rulesquiz-app .rq-option:hover,html[data-bs-theme="dark"] #rulesquiz-app .rq-option:hover{background:#162032;border-color:#64748b}
+.rq-dark #rulesquiz-app .rq-option:has(input:checked),html[data-bs-theme="dark"] #rulesquiz-app .rq-option:has(input:checked){background:#1e2b47;border-color:#4f7cff}
+.rq-dark #rulesquiz-app .rq-option-text,html[data-bs-theme="dark"] #rulesquiz-app .rq-option-text,.rq-dark #rulesquiz-app .rq-question-body,html[data-bs-theme="dark"] #rulesquiz-app .rq-question-body{color:#cbd5e1}
+.rq-dark #rulesquiz-app button.rq-btn,html[data-bs-theme="dark"] #rulesquiz-app button.rq-btn,.rq-dark #rulesquiz-app a.rq-btn,html[data-bs-theme="dark"] #rulesquiz-app a.rq-btn{background:#1e293b!important;color:#e2e8f0!important;border-color:#334155!important}
+.rq-dark #rulesquiz-app button.rq-btn--primary,html[data-bs-theme="dark"] #rulesquiz-app button.rq-btn--primary,.rq-dark #rulesquiz-app a.rq-btn--primary,html[data-bs-theme="dark"] #rulesquiz-app a.rq-btn--primary{background:linear-gradient(135deg,#4f7cff,#3b5fe2)!important;color:#fff!important;border-color:#3b5fe2!important}
+.rq-dark #rulesquiz-app .rq-input,html[data-bs-theme="dark"] #rulesquiz-app .rq-input{background:#0f172a;border-color:#334155;color:#e2e8f0}
+.rq-dark #rulesquiz-app .rq-progress,html[data-bs-theme="dark"] #rulesquiz-app .rq-progress{background:#334155}
+.rq-dark #rulesquiz-app .rq-timer,html[data-bs-theme="dark"] #rulesquiz-app .rq-timer{background:#334155;color:#f1f5f9}
+.rq-dark #rulesquiz-app .rq-pq-value,html[data-bs-theme="dark"] #rulesquiz-app .rq-pq-value,.rq-dark #rulesquiz-app .rq-pq-title,html[data-bs-theme="dark"] #rulesquiz-app .rq-pq-title{color:#e2e8f0}
+.rq-dark #rulesquiz-app .rq-pq-explain,html[data-bs-theme="dark"] #rulesquiz-app .rq-pq-explain{color:#cbd5e1}
+@media (prefers-color-scheme:dark){
+  html:not([data-bs-theme="light"]) #rulesquiz-app{color:#e2e8f0}
+  html:not([data-bs-theme="light"]) #rulesquiz-app .rq-card{background:#1e293b;border-color:#334155}
+  html:not([data-bs-theme="light"]) #rulesquiz-app .rq-heading,html:not([data-bs-theme="light"]) #rulesquiz-app .rq-question-title{color:#f1f5f9}
+  html:not([data-bs-theme="light"]) #rulesquiz-app .rq-rules-body,html:not([data-bs-theme="light"]) #rulesquiz-app .rq-intro-body,html:not([data-bs-theme="light"]) #rulesquiz-app .rq-option,html:not([data-bs-theme="light"]) #rulesquiz-app .rq-checkbox,html:not([data-bs-theme="light"]) #rulesquiz-app .rq-input{background:#0f172a;border-color:#334155;color:#cbd5e1}
+  html:not([data-bs-theme="light"]) #rulesquiz-app .rq-option-text,html:not([data-bs-theme="light"]) #rulesquiz-app .rq-question-body{color:#cbd5e1}
+}
 </style>
 
 <div id="rulesquiz-app" class="rulesquiz-container" dir="{{{ if rtl }}}rtl{{{ else }}}ltr{{{ end }}}" lang="{lang}">

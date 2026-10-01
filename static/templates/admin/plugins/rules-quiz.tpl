@@ -78,6 +78,10 @@
 						<input type="checkbox" class="form-check-input" id="rq-logFullAnswers" data-field="logFullAnswers">
 						<label class="form-check-label" for="rq-logFullAnswers">[[rulesquiz:admin.field.logFullAnswers]]</label>
 					</div>
+					<div class="form-check form-switch rq-row">
+						<input type="checkbox" class="form-check-input" id="rq-showStatusBadge" data-field="showStatusBadge">
+						<label class="form-check-label" for="rq-showStatusBadge">[[rulesquiz:admin.field.showStatusBadge]]</label>
+					</div>
 				</div>
 
 				<div class="rq-card">

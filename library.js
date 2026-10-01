@@ -56,7 +56,14 @@ function hasRecentGatePass(uid, kind) {
  */
 plugin.init = async function (params) {
   try {
-    await db.getSettings();
+    const settings = await db.getSettings();
+    // Stamp the activation cutoff ONCE. After this, only users who join
+    // from now on count as "new" for gating — existing members are not
+    // retroactively blocked. (See policy.needsQuiz.)
+    if (!settings.activatedAt) {
+      await db.setSettings({ activatedAt: Date.now() });
+      winston.info('[rules-quiz] activation cutoff stamped — existing members will NOT be gated as new');
+    }
   } catch (e) {
     winston.warn('[rules-quiz] could not initialise settings: ' + e.message);
   }
