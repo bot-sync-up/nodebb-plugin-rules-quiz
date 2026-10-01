@@ -1,7 +1,23 @@
 'use strict';
 
-define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], function (Settings, alerts, translator) {
+define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], function (Settings, coreAlerts, translator) {
 	var ACP = {};
+
+	// NodeBB 4.16 toasts translate a message only when it is exactly one
+	// [[key]] token, and ours often carry details ("[[key]]: reason").
+	// Translate the whole text first; versions that translate again just
+	// see plain text.
+	function translateText(text, cb) {
+		if (translator && typeof translator.translate === 'function') {
+			translator.translate(String(text), cb);
+		} else {
+			cb(String(text));
+		}
+	}
+	var alerts = {
+		success: function (msg, timeout) { translateText(msg, function (t) { coreAlerts.success(t, timeout); }); },
+		error: function (msg, timeout) { translateText(msg, function (t) { coreAlerts.error(t, timeout); }); },
+	};
 	var API_BASE = '/api/v3/plugins/rules-quiz/admin';
 	var state = {
 		settings: null,
@@ -551,7 +567,12 @@ define('admin/plugins/rules-quiz', ['settings', 'alerts', 'translator'], functio
 	}
 
 	function deleteQuestion(qid) {
-		if (!window.confirm('[[rulesquiz:admin.confirm_delete]]')) { return; }
+		confirmAction('[[rulesquiz:admin.confirm_delete]]').then(function (ok) {
+			if (ok) { doDeleteQuestion(qid); }
+		});
+	}
+
+	function doDeleteQuestion(qid) {
 		console.log('[rules-quiz/acp] DELETE question', qid);
 		apiFetch('DELETE', API_BASE + '/questions/' + encodeURIComponent(qid)).then(function (res) {
 			console.log('[rules-quiz/acp] DELETE response', res);

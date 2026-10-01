@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Unit tests for lib/policy.js — pure logic, no NodeBB internals required.
+ * Unit tests — pure logic and template checks, no NodeBB internals required.
  * Run with: npm test   (plain `node test/policy.test.js`, works on Node 14+).
  *
  * A tiny zero-dependency assert harness so this runs anywhere without a
@@ -125,6 +125,62 @@ test('needsQuiz: passed user never gated', () => {
   assert.strictEqual(policy.needsQuiz(user, { status: 'passed' }, settings), false);
 });
 
+test('needsQuiz: a new user who failed under cooldown mode is still gated', () => {
+  const settings = { enabled: true, activatedAt: 1000, appliesTo: { newUsers: true } };
+  const user = { uid: 9, joindate: 2000, groups: [] };
+  assert.strictEqual(policy.needsQuiz(user, { status: 'failed_cooldown' }, settings), true);
+  assert.strictEqual(policy.needsQuiz(user, { status: 'locked' }, settings), true);
+});
+
+// --- evaluateWrite (v0.8.5): the single gate decision ---------------------
+const GATES = {
+  enabled: true, activatedAt: 1000, appliesTo: { newUsers: true, existingUsers: false },
+  exemptGroups: ['administrators'],
+  postGate: { enabled: true, applyForFirstN: 10 }, topicGate: { enabled: true, applyForFirstN: 5 },
+};
+const NOW = 5000;
+const newbie = { uid: 20, joindate: 2000, groups: [], postcount: 3, topiccount: 1 };
+const veteran = { uid: 21, joindate: 500, groups: [], postcount: 40, topiccount: 7 };
+
+test('evaluateWrite: member who predates the plugin is not gated at all', () => {
+  assert.strictEqual(policy.evaluateWrite('post', veteran, {}, GATES, NOW).reason, 'not-targeted');
+  assert.strictEqual(policy.evaluateWrite('topic', veteran, {}, GATES, NOW).allowed, true);
+});
+test('evaluateWrite: new user who has not passed onboarding', () => {
+  const v = policy.evaluateWrite('post', newbie, { status: 'pending' }, GATES, NOW);
+  assert.deepStrictEqual(v, { allowed: false, reason: 'needs-onboarding' });
+});
+test('evaluateWrite: passed onboarding, no token → needs the mini-quiz', () => {
+  const v = policy.evaluateWrite('post', newbie, { status: 'passed', postsCreated: 2 }, GATES, NOW);
+  assert.deepStrictEqual(v, { allowed: false, reason: 'needs-quiz' });
+});
+test('evaluateWrite: an unused token allows the write', () => {
+  const v = policy.evaluateWrite('post', newbie, { status: 'passed', postTokenExp: NOW + 1 }, GATES, NOW);
+  assert.strictEqual(v.reason, 'token');
+});
+test('evaluateWrite: NodeBB rejected the last attempt (count unchanged) → retry allowed', () => {
+  const s = { status: 'passed', postsCreated: 1, pendingKind: 'post', pendingAt: NOW - 1000, pendingCount: 3 };
+  assert.strictEqual(policy.evaluateWrite('post', newbie, s, GATES, NOW).reason, 'retry');
+});
+test('evaluateWrite: last attempt succeeded (count moved) → needs a new quiz', () => {
+  const s = { status: 'passed', postsCreated: 1, pendingKind: 'post', pendingAt: NOW - 1000, pendingCount: 2 };
+  assert.strictEqual(policy.evaluateWrite('post', newbie, s, GATES, NOW).reason, 'needs-quiz');
+});
+test('evaluateWrite: retry allowance expires with the token lifetime', () => {
+  const s = { status: 'passed', pendingKind: 'post', pendingAt: NOW - policy.TOKEN_TTL_MS - 1, pendingCount: 3 };
+  assert.strictEqual(policy.evaluateWrite('post', newbie, s, GATES, NOW).reason, 'needs-quiz');
+});
+test('evaluateWrite: a pending reply does not unlock a new topic', () => {
+  const s = { status: 'passed', pendingKind: 'post', pendingAt: NOW - 1000, pendingCount: 1 };
+  assert.strictEqual(policy.evaluateWrite('topic', newbie, s, GATES, NOW).reason, 'needs-quiz');
+});
+test('evaluateWrite: admin-exempted user (status=exempt) is not gated', () => {
+  assert.strictEqual(policy.evaluateWrite('post', newbie, { status: 'exempt' }, GATES, NOW).reason, 'exempt');
+});
+test('evaluateWrite: past the first-N window', () => {
+  assert.strictEqual(policy.evaluateWrite('post', newbie, { status: 'passed', postsCreated: 10 }, GATES, NOW).reason, 'past-window');
+});
+
 // --- canAttempt ------------------------------------------------------------
 test('canAttempt: locked status blocks', () => {
   const r = policy.canAttempt({ status: 'locked' }, { onFail: {} }, Date.now());
@@ -178,6 +234,57 @@ testAsync('withUserLock releases the lock after an error', async () => {
   const r = await withUserLock(9, async () => 'next');
   assert.strictEqual(r, 'next');
   assert.strictEqual(activeLockCount(), 0);
+});
+
+// --- i18n + templates ---------------------------------------------------------
+const fs = require('fs');
+const path = require('path');
+const i18n = require('../lib/i18n');
+
+test('i18n.isRtl: Hebrew and Arabic are RTL, English is not', () => {
+  assert.strictEqual(i18n.isRtl('he'), true);
+  assert.strictEqual(i18n.isRtl('ar'), true);
+  assert.strictEqual(i18n.isRtl('en-GB'), false);
+});
+test('i18n.sanitizeLang rejects path-like values', () => {
+  assert.strictEqual(i18n.sanitizeLang('pt-BR'), 'pt-BR');
+  assert.strictEqual(i18n.sanitizeLang('../../etc'), '');
+  assert.strictEqual(i18n.sanitizeLang(undefined), '');
+});
+
+const TEMPLATES = ['quiz/index.tpl', 'admin/plugins/rules-quiz.tpl'];
+const enStrings = require('../languages/en-GB/rulesquiz.json');
+const heStrings = require('../languages/he/rulesquiz.json');
+TEMPLATES.forEach((name) => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'static', 'templates', name), 'utf8');
+  // NodeBB 4.16 no longer translates [[...]] tokens in rendered pages.
+  test(name + ': no [[rulesquiz:...]] tokens (use {t.key})', () => {
+    assert.deepStrictEqual(src.match(/\[\[rulesquiz:[^\]]+\]\]/g), null);
+  });
+  test(name + ': every {t.key} exists in both languages', () => {
+    const keys = Object.keys(enStrings).map((k) => k.replace(/\./g, '_'));
+    const heKeys = Object.keys(heStrings).map((k) => k.replace(/\./g, '_'));
+    const missing = (src.match(/\{t\.([a-z0-9_]+)\}/gi) || [])
+      .map((ref) => ref.slice(3, -1))
+      .filter((k) => keys.indexOf(k) === -1 || heKeys.indexOf(k) === -1);
+    assert.deepStrictEqual(missing, []);
+  });
+  // Benchpress reads `{display:none}` as a variable and drops the rule.
+  test(name + ': every inline CSS block ends with ";"', () => {
+    const css = (src.match(/<style>[\s\S]*?<\/style>/g) || []).join('\n');
+    const bad = (css.match(/\{[^{}]*\}/g) || []).filter((b) => !/;\s*\}$/.test(b) && !/^\{\s*\}$/.test(b));
+    assert.deepStrictEqual(bad, []);
+  });
+});
+test('quiz template outputs JSON and HTML raw ({{var}})', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'static', 'templates', 'quiz', 'index.tpl'), 'utf8');
+  ['questionsJson', 'settingsJson', 'gateProgressJson', 'rulesHtml', 'introHtml'].forEach((v) => {
+    assert.ok(src.indexOf('{{' + v + '}}') !== -1, v + ' must be output raw');
+    assert.ok(!new RegExp('[^{]\\{' + v + '\\}[^}]').test(src), v + ' must not be output escaped');
+  });
+});
+test('language files have the same keys', () => {
+  assert.deepStrictEqual(Object.keys(heStrings).sort(), Object.keys(enStrings).sort());
 });
 
 (async () => {

@@ -20,6 +20,7 @@ const winston = (() => {
 const plugin = {};
 
 const { withUserLock } = require('./lib/lock');
+const { getMinimalUser } = require('./lib/users');
 
 /**
  * static:app.load
@@ -166,17 +167,18 @@ plugin.gate = async function (data) {
 };
 
 /**
- * Two-stage gate for writes:
- *   1. Onboarding gate: user hasn't passed the initial rules quiz at all.
- *      (Same behavior as before — blocks regardless of kind.)
- *   2. Per-kind gate: even after onboarding, the first N replies and the
- *      first M topics each require a fresh mini-quiz. POST /submit mints a
- *      single-use token in the user-state hash on a pass; this consumes it.
+ * Write gate. policy.evaluateWrite decides; this applies the verdict:
+ *   - needs-onboarding → reject (the user hasn't passed the rules quiz)
+ *   - token            → allow, consume the single-use token, count the write
+ *   - retry            → allow without a new quiz: NodeBB rejected the
+ *                        previous attempt after the token was spent
+ *   - needs-quiz       → reject, the user must pass the per-reply/topic quiz
+ *   - anything else    → allow (exempt, not targeted, past the window...)
  *
  * Called only from guardShouldQueue, under a per-user lock.
  *
  * @param {'post'|'topic'} kind  `'post'` for replies, `'topic'` for new topics.
- * @param {object} data  NodeBB hook payload.
+ * @param {object} data  { uid, data, queued }
  * @returns {Promise<object>}
  */
 async function guardKind(kind, data) {
@@ -185,57 +187,52 @@ async function guardKind(kind, data) {
 
   const settings = await db.getSettings();
   if (!settings.enabled) return data;
-  // 'modal_soft' was a no-op mode (it blocked nothing) — removed from the
-  // ACP in v0.8.0. Any stored value now behaves like 'block_write' so the
-  // gate actually enforces. 'block_all' also blocks writes.
 
-  const user = await getMinimalUser(uid);
-  if (policy.isExempt(user, settings)) return data;
+  const [user, state] = await Promise.all([getMinimalUser(uid), db.getUserState(uid)]);
+  const now = Date.now();
+  const verdict = policy.evaluateWrite(kind, user, state, settings, now);
 
-  const state = await db.getUserState(uid);
-
-  // --- Stage 1: onboarding gate --------------------------------------
-  // If they still need the initial quiz, block every kind of write.
-  if (policy.needsQuiz(user, state || {}, settings)) {
-    const e = new Error('[[rulesquiz:error.must_pass_first]]');
+  if (verdict.reason === 'needs-onboarding') {
+    // The [code] marker lets gate-redirect.js recognise the rejection.
+    const e = new Error('[[rulesquiz:error.must_pass_first]] [rules-quiz:not-passed]');
     e.code = 'rules-quiz:not-passed';
     throw e;
   }
 
-  // --- Stage 2: per-kind gate ----------------------------------------
-  const gate = kind === 'topic' ? settings.topicGate : settings.postGate;
-  if (!gate || !gate.enabled) return data;
-  const limit = Number(gate.applyForFirstN || 0);
-  if (limit <= 0) return data;
-
-  const countField = kind === 'topic' ? 'topicsCreated' : 'postsCreated';
-  const already = Number((state && state[countField]) || 0);
-  if (already >= limit) return data; // past the gate window — free to post
-
-  // Single-use token minted by POST /submit when the mini-quiz is passed.
-  // Stored in the user-state hash (DB) because the write hook has no session.
-  const now = Date.now();
-  const dbField = kind === 'topic' ? 'topicTokenExp' : 'postTokenExp';
-  const hasToken = Number((state && state[dbField]) || 0) > now;
-
-  if (hasToken) {
-    // Consume the token and count the write. The caller holds a per-user
-    // lock, so a concurrent submit can't also see this token.
+  if (verdict.reason === 'token') {
+    const countField = kind === 'topic' ? 'topicsCreated' : 'postsCreated';
+    const dbField = kind === 'topic' ? 'topicTokenExp' : 'postTokenExp';
+    const already = Number(state[countField] || 0);
     let newCount = already + 1;
     try {
       newCount = await db.incrUserField(uid, countField, 1);
     } catch (_) {
-      // Fallback to the non-atomic path if incr isn't available.
       await db.setUserState(uid, { [countField]: already + 1 });
     }
-    await db.setUserState(uid, { [dbField]: 0, lastGateAt: now, lastGateKind: kind });
-    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' count=' + newCount + '/' + limit);
+    // This hook runs before NodeBB validates the post (length, flood
+    // control...). Remember the attempt and the user's NodeBB post/topic
+    // count, so a retry after a rejection isn't sent back to the quiz.
+    // A queued post is final, so nothing to remember for it.
+    const liveCount = Number((kind === 'topic' ? user.topiccount : user.postcount) || 0);
+    const pending = data.queued
+      ? { pendingKind: '', pendingAt: 0, pendingCount: 0 }
+      : { pendingKind: kind, pendingAt: now, pendingCount: liveCount };
+    await db.setUserState(uid, Object.assign({ [dbField]: 0, lastGateAt: now, lastGateKind: kind }, pending));
+    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' count=' + newCount);
     return data;
   }
 
-  // No valid token — redirect them to the right mini-quiz.
+  if (verdict.reason === 'retry') {
+    await db.setUserState(uid, { pendingAt: now });
+    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' (retry after NodeBB rejected the previous attempt)');
+    return data;
+  }
+
+  if (verdict.allowed) return data;
+
+  // needs-quiz: send them to the right mini-quiz.
   // Embed the gate code in the error message too, so the client-side
-  // gate-redirect.js script can reliably detect it in the toast text.
+  // gate-redirect.js script can recognise the rejection.
   const code = kind === 'topic' ? 'rules-quiz:topic-gate' : 'rules-quiz:post-gate';
   const key = kind === 'topic' ? 'error.need_topic_quiz' : 'error.need_post_quiz';
   winston.info('[rules-quiz] ' + kind + ' gate BLOCKED uid=' + uid + ' (no token)');
@@ -277,7 +274,7 @@ plugin.guardShouldQueue = async function (payload) {
       + ' title=' + (d.title ? JSON.stringify(d.title).slice(0, 60) : '(none)')
       + ' tid=' + (d.tid || '-') + ' cid=' + (d.cid || '-')
       + ' payloadType=' + (payload.type || '-'));
-    await withUserLock(uid, () => guardKind(kind, { uid: uid, data: d }));
+    await withUserLock(uid, () => guardKind(kind, { uid: uid, data: d, queued: !!payload.shouldQueue }));
     return payload;
   } catch (e) {
     if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
@@ -285,39 +282,5 @@ plugin.guardShouldQueue = async function (payload) {
     return payload;
   }
 };
-
-async function getMinimalUser(uid) {
-  // Be defensive: each of the three lookups can throw independently
-  // (e.g., DB blip, NodeBB API change). Returning {uid} with no groups
-  // used to make admins fail-CLOSED — they'd lose group-based exemption
-  // and get blocked by their own gate. We try each lookup individually,
-  // also consult isAdministrator/isGlobalMod directly so we never lose
-  // staff exemption due to a groups-lookup failure.
-  const user = (() => { try { return require.main.require('./src/user'); } catch (e) { return null; } })();
-  const groups = (() => { try { return require.main.require('./src/groups'); } catch (e) { return null; } })();
-  let data = {};
-  let groupNames = [];
-  if (user) {
-    try { data = await user.getUserFields(uid, ['uid', 'username', 'reputation', 'joindate']) || {}; } catch (_) { /* keep {} */ }
-    try {
-      const isAdmin = await user.isAdministrator(uid);
-      if (isAdmin) groupNames.push('administrators');
-    } catch (_) { /* noop */ }
-    try {
-      if (typeof user.isGlobalModerator === 'function') {
-        const isMod = await user.isGlobalModerator(uid);
-        if (isMod) groupNames.push('Global Moderators');
-      }
-    } catch (_) { /* noop */ }
-  }
-  if (groups) {
-    try {
-      const arr = await groups.getUserGroups([uid]);
-      const list = (arr && arr[0]) || [];
-      list.forEach((g) => { if (g && g.name && groupNames.indexOf(g.name) === -1) groupNames.push(g.name); });
-    } catch (_) { /* keep what we have */ }
-  }
-  return Object.assign({}, data, { uid: uid, groups: groupNames });
-}
 
 module.exports = plugin;

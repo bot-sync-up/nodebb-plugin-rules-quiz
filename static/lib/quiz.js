@@ -41,8 +41,16 @@ define('forum/plugins/rules-quiz', [
 		if (!node) {
 			return { questions: [], settings: {}, gateAck: false, rtl: false, lang: 'en-GB' };
 		}
+		const raw = node.textContent || node.innerText || '{}';
 		try {
-			return JSON.parse(node.textContent || node.innerText || '{}');
+			return JSON.parse(raw);
+		} catch (e) { /* try entity-decoded below */ }
+		// A template that outputs the JSON with Benchpress' escaping {var}
+		// (instead of the raw {{var}}) leaves &quot; etc. in the script text.
+		try {
+			const ta = document.createElement('textarea');
+			ta.innerHTML = raw;
+			return JSON.parse(ta.value);
 		} catch (e) {
 			return { questions: [], settings: {}, gateAck: false, rtl: false, lang: 'en-GB' };
 		}
@@ -211,7 +219,8 @@ define('forum/plugins/rules-quiz', [
 	 */
 	function fetchBootstrap() {
 		const headers = { Accept: 'application/json' };
-		return fetch(API_BASE + '/quiz', {
+		// Keep ?mode=post|topic — without it the API serves the onboarding quiz.
+		return fetch(API_BASE + '/quiz' + (window.location.search || ''), {
 			method: 'GET',
 			credentials: 'same-origin',
 			headers: headers,
@@ -228,6 +237,8 @@ define('forum/plugins/rules-quiz', [
 				questions: Array.isArray(data && data.questions) ? data.questions : [],
 				settings: (data && data.settings) || {},
 				gateAck: !!(data && data.gateAck),
+				mode: (data && data.mode) || '',
+				gateProgress: (data && data.gateProgress) || null,
 			};
 		});
 	}
@@ -425,17 +436,18 @@ define('forum/plugins/rules-quiz', [
 		const total = state.questions.length;
 		const idx = state.idx;
 
-		// Gate-progress header ("שער פוסט #3 מתוך 10") — rendered at the
+		// Gate-progress header ("Reply quiz 3 of 10") — rendered at the
 		// top of gated (post/topic) quizzes.
 		const gpEl = document.getElementById('rq-gate-progress');
 		if (state.gateProgress && state.mode && state.mode !== 'onboarding') {
 			const gp = state.gateProgress;
-			const label = gp.kind === 'topic'
-				? ('שער נושא #' + gp.current + ' מתוך ' + gp.total)
-				: ('שער פוסט #' + gp.current + ' מתוך ' + gp.total);
+			const token = '[[rulesquiz:' + (gp.kind === 'topic' ? 'gate.progress_topic' : 'gate.progress_post')
+				+ ', ' + Number(gp.current || 0) + ', ' + Number(gp.total || 0) + ']]';
 			if (gpEl) {
-				gpEl.textContent = label;
-				gpEl.hidden = false;
+				translator.translate(token, function (label) {
+					gpEl.textContent = label;
+					gpEl.hidden = false;
+				});
 			}
 		} else if (gpEl) {
 			gpEl.hidden = true;
@@ -757,12 +769,12 @@ define('forum/plugins/rules-quiz', [
 				const statusIcon = pq.correct ? '✅' : '❌';
 				const statusClass = pq.correct ? 'rq-pq-correct' : 'rq-pq-wrong';
 				const num = idx + 1;
-				const title = esc(pq.title || ('שאלה ' + num));
-				const given = pq.given ? esc(pq.given) : '<em style="opacity:.6">לא נענתה</em>';
+				const title = pq.title ? esc(pq.title) : '[[rulesquiz:result.question_n, ' + num + ']]';
+				const given = pq.given ? esc(pq.given) : '<em style="opacity:.6">[[rulesquiz:result.not_answered]]</em>';
 				const correctAnswer = pq.correctAnswer ? esc(pq.correctAnswer) : '';
 				const explanation = pq.explanation ? esc(pq.explanation) : '';
 				const ruleLink = pq.ruleLinkUrl
-					? ' <a href="' + safeUrl(pq.ruleLinkUrl) + '" target="_blank" rel="noopener" class="rq-pq-rulelink">🔗 לחוק</a>'
+					? ' <a href="' + safeUrl(pq.ruleLinkUrl) + '" target="_blank" rel="noopener" class="rq-pq-rulelink">🔗 [[rulesquiz:result.rule_link]]</a>'
 					: '';
 
 				// Always auto-expand the breakdown so users see explanations
@@ -773,14 +785,14 @@ define('forum/plugins/rules-quiz', [
 					+ '<span class="rq-pq-num">' + num + '.</span>'
 					+ '<span class="rq-pq-title">' + title + '</span></summary>'
 					+ '<div class="rq-pq-body">'
-					+   '<div class="rq-pq-row"><span class="rq-pq-label">התשובה שלך:</span> <span class="rq-pq-value">' + given + '</span></div>'
-					+   (!pq.correct && correctAnswer ? '<div class="rq-pq-row"><span class="rq-pq-label">התשובה הנכונה:</span> <span class="rq-pq-value rq-pq-correct-text">' + correctAnswer + '</span></div>' : '')
+					+   '<div class="rq-pq-row"><span class="rq-pq-label">[[rulesquiz:result.your_answer]]</span> <span class="rq-pq-value">' + given + '</span></div>'
+					+   (!pq.correct && correctAnswer ? '<div class="rq-pq-row"><span class="rq-pq-label">[[rulesquiz:result.correct_answer]]</span> <span class="rq-pq-value rq-pq-correct-text">' + correctAnswer + '</span></div>' : '')
 					+   (explanation ? '<div class="rq-pq-explain">💡 ' + explanation + ruleLink + '</div>' : ruleLink ? '<div class="rq-pq-explain">' + ruleLink + '</div>' : '')
 					+ '</div>'
 					+ '</details>';
 			}).join('');
 			breakdownHtml = '<div class="rq-pq-list">'
-				+ '<h3 class="rq-pq-heading">פירוט התשובות</h3>'
+				+ '<h3 class="rq-pq-heading">[[rulesquiz:result.breakdown]]</h3>'
 				+ rows
 				+ '</div>';
 		}
@@ -961,6 +973,8 @@ define('forum/plugins/rules-quiz', [
 					gateAck: fetched.gateAck || boot.gateAck,
 					rtl: boot.rtl,
 					lang: boot.lang,
+					mode: fetched.mode || boot.mode,
+					gateProgress: fetched.gateProgress || boot.gateProgress,
 				});
 				// Re-wire now that state is real (some handlers read settings).
 				setupRulesScreen();

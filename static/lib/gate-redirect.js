@@ -3,20 +3,13 @@
 /* global MutationObserver */
 
 /**
- * gate-redirect.js (v0.7.0)
+ * gate-redirect.js
  *
- * Strategy: instead of trying to match server error toasts (which is
- * fragile — translation + markup change between NodeBB versions and
- * themes), we intercept the actual SUBMIT button clicks inside the
- * composer. Right after the user clicks Submit we ask the server for
- * the current gate status and, if a gate is active and the user has no
- * token, redirect them to the matching mini-quiz.
- *
- * The eager check fires only on submit-button clicks, never on Reply
- * or New-Topic buttons that just open the composer — so the user can
- * browse the forum freely. The actual submit may still go through if
- * it races us; that's fine, the server will reject and we'll catch the
- * follow-up alert via DOM scan as a backup.
+ * When the server rejects a reply or new topic because of a quiz gate, send
+ * the user to the matching quiz (saving their draft first). The rejection
+ * is recognised by a marker the server puts in the error text
+ * ([rules-quiz:post-gate], [rules-quiz:topic-gate], [rules-quiz:not-passed]),
+ * read from the composer's error hook and, as a backup, from error toasts.
  */
 
 (function () {
@@ -24,9 +17,9 @@
 	if (window.__rqGateRedirectV7) return;
 	window.__rqGateRedirectV7 = true;
 
-	var STATUS_URL = '/api/v3/plugins/rules-quiz/gate-status';
 	var POST_CODE = 'rules-quiz:post-gate';
 	var TOPIC_CODE = 'rules-quiz:topic-gate';
+	var ONBOARDING_CODE = 'rules-quiz:not-passed';
 
 	function currentReturnTo() {
 		return window.location.pathname + (window.location.search || '');
@@ -37,6 +30,23 @@
 	// own draft saver doesn't always cover NEW-topic state, leading to
 	// users typing a title + body, getting bounced to the quiz, and coming
 	// back to an empty composer.
+	// Which topic (reply) or category (new topic) a composer posts to.
+	// NodeBB 4 (Harmony) no longer puts data-tid / data-cid on the composer:
+	// there, a composer with a title field opens a topic and one without
+	// replies to the topic on screen.
+	function composerTarget(composer) {
+		var ds = composer.dataset || {};
+		var tid = parseInt(ds.tid, 10) > 0 ? String(ds.tid) : '';
+		var cid = ds.cid ? String(ds.cid) : '';
+		if (!tid && !cid) {
+			var hasTitle = !!composer.querySelector('input[name="title"], input.title, [component="composer/title"]');
+			var page = (window.ajaxify && window.ajaxify.data) || {};
+			if (hasTitle) cid = page.cid ? String(page.cid) : '';
+			else if (page.tid) tid = String(page.tid);
+		}
+		return { tid: tid, cid: cid };
+	}
+
 	function captureComposerDraft() {
 		var composer = document.querySelector('[component="composer"], .composer');
 		if (!composer) return null;
@@ -52,11 +62,12 @@
 		// Quill rich-text composer stores body in a contenteditable div.
 		var quillEl = composer.querySelector('.ql-editor');
 		var body = (bodyEl && bodyEl.value) || (quillEl ? (quillEl.textContent || '').trim() : '');
+		var target = composerTarget(composer);
 		var draft = {
 			title: (titleEl && titleEl.value) || '',
 			body: body,
-			cid: composer.dataset && composer.dataset.cid,
-			tid: composer.dataset && composer.dataset.tid,
+			cid: target.cid,
+			tid: target.tid,
 			at: Date.now(),
 		};
 		if (!draft.title && !draft.body) return null;
@@ -71,7 +82,21 @@
 		} catch (_) { /* noop */ }
 	}
 
+	// A composer posting a new topic, or replying. Harmony (NodeBB 4) puts
+	// no tid/cid on the composer; there a title field means a new topic.
+	function composerKind(composer) {
+		if (!composer) return 'post';
+		var target = composerTarget(composer);
+		if (target.tid) return 'post';
+		if (target.cid) return 'topic';
+		return composer.querySelector('input[name="title"], input.title, [component="composer/title"]') ? 'topic' : 'post';
+	}
+
+	var redirecting = false;
+
 	function redirect(mode) {
+		if (redirecting) return;
+		redirecting = true;
 		var returnTo = currentReturnTo();
 		try { sessionStorage.setItem('rqReturnTo', returnTo); } catch (_) { /* noop */ }
 		// Save whatever the user has typed BEFORE we navigate away.
@@ -79,8 +104,10 @@
 		// Hint draft-restore.js to auto-reopen the composer after the user
 		// passes the quiz and lands back here. The 'onboarding' redirect
 		// carries no ?mode so the quiz page runs the full rules -> intro ->
-		// questions flow; the re-open kind is derived from the last submit.
-		var openKind = (mode === 'topic') ? 'topic' : 'post';
+		// questions flow; the composer to re-open is the one that failed.
+		var openKind = mode === 'onboarding'
+			? composerKind(document.querySelector('[component="composer"], .composer'))
+			: (mode === 'topic' ? 'topic' : 'post');
 		try { sessionStorage.setItem('rqAutoOpenComposer', openKind); } catch (_) { /* noop */ }
 		var url = (mode === 'onboarding')
 			? '/quiz?returnTo=' + encodeURIComponent(returnTo)
@@ -88,105 +115,46 @@
 		window.location.href = url;
 	}
 
-	function fetchStatus() {
-		return fetch(STATUS_URL, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-			.then(function (r) { return r.json(); })
-			.then(function (j) { return (j && j.response !== undefined) ? j.response : j; })
-			.catch(function () { return null; });
+	// The server rejects a gated write with an error whose text carries one
+	// of these markers (library.js guardKind). Only an actual rejection
+	// redirects: checking gate-status after a submit click could not tell a
+	// rejected post from one that just went through and spent the token, and
+	// sent users back to the quiz after every successful gated reply.
+	function gateFromText(text) {
+		text = String(text || '');
+		if (text.indexOf(POST_CODE) !== -1) return 'post';
+		if (text.indexOf(TOPIC_CODE) !== -1) return 'topic';
+		if (text.indexOf(ONBOARDING_CODE) !== -1) return 'onboarding';
+		return '';
 	}
 
-	// Decide if this submit is a NEW TOPIC or a REPLY based on the composer
-	// header / hidden inputs. NodeBB composer-default puts a hidden field
-	// `data-action="post"` with a tid (= reply) or cid (= new topic).
-	function detectKind(submitEl) {
-		var composer = submitEl.closest('[component="composer"]')
-			|| submitEl.closest('.composer')
-			|| submitEl.closest('[data-cid],[data-tid]')
-			|| document.querySelector('[component="composer"]');
-		if (!composer) return 'post'; // safe default
-		// PRIMARY signal: a real target topic id (tid > 0) means this is a
-		// REPLY. A new-topic composer has no tid, or tid='0'/'' (Harmony
-		// sets '0'). We check tid NUMERICALLY — the old "any title input =
-		// topic" rule misclassified replies on themes that keep a hidden
-		// title input in the reply composer, sending every reply to the
-		// topic quiz. tid is the unambiguous signal.
-		var tidRaw = (composer.dataset && composer.dataset.tid) || '';
-		var tid = parseInt(tidRaw, 10);
-		if (tid > 0) return 'post';
-		// No real tid → new topic (it will have a cid and/or a title input).
-		if (composer.dataset && composer.dataset.cid) return 'topic';
-		var titleInput = composer.querySelector('input[name="title"]')
-			|| composer.querySelector('input.title')
-			|| composer.querySelector('[component="composer/title"]');
-		if (titleInput) return 'topic';
-		return 'post';
-	}
-
-	// Submit-button selectors — VERY specific so we never catch nav links.
-	var SUBMIT_SELECTORS = [
-		'[component="composer/submit"]',
-		'.composer-submit',
-		'[data-action="post"]',
-	];
-
-	function matchesAny(el, selectors) {
-		if (!el || !el.closest) return null;
-		for (var i = 0; i < selectors.length; i++) {
-			var m = el.closest(selectors[i]);
-			if (m) return m;
-		}
-		return null;
-	}
-
-	function onSubmitClick(e) {
-		var btn = matchesAny(e.target, SUBMIT_SELECTORS);
-		if (!btn) return;
-		// Eagerly check gate-status. If it shows we're blocked, preventDefault
-		// and redirect. We CANNOT block the click synchronously while we wait
-		// (fetch is async), so we let the click proceed AND queue a backup
-		// check 800ms later — if the gate response came back with a block,
-		// redirect even if NodeBB already errored out.
-		var kind = detectKind(btn);
-		setTimeout(function () {
-			fetchStatus().then(function (status) {
-				if (!status || !status.loggedIn) return;
-				// Onboarding takes precedence: a user who hasn't passed (and
-				// isn't exempt) must do the FULL onboarding quiz, not the
-				// short per-post/topic mini-quiz. Redirect to /quiz with no
-				// mode so decideInitialScreen shows rules -> intro -> quiz.
-				if (!status.onboardingPassed && !status.onboardingExempt) {
-					redirect('onboarding');
-					return;
-				}
-				if (kind === 'topic') {
-					if (status.topicGate && status.topicGate.active && !status.topicGate.hasToken) {
-						redirect('topic');
-					}
-				} else {
-					if (status.postGate && status.postGate.active && !status.postGate.hasToken) {
-						redirect('post');
-					}
-				}
+	// Primary: the composer's own error hook (nodebb-plugin-composer-default).
+	function wireComposerHook() {
+		var onHooks = function (hooks) {
+			if (!hooks || typeof hooks.on !== 'function') return;
+			hooks.on('filter:composer.error', function (data) {
+				var gate = gateFromText(data && data.message);
+				if (gate) redirect(gate);
+				return data;
 			});
-		}, 800);
+		};
+		try {
+			if (window.app && typeof window.app.require === 'function') {
+				window.app.require('hooks').then(onHooks, function () { /* older NodeBB */ });
+			} else if (typeof window.require === 'function') {
+				window.require(['hooks'], onHooks);
+			}
+		} catch (_) { /* the toast scan below still works */ }
 	}
 
-	document.addEventListener('click', onSubmitClick, true); // capture phase
-
-	// Backup: also scan for our exact code markers in alert toasts. Useful
-	// if NodeBB shows the error in a non-standard container.
+	// Backup: scan error toasts for the markers — covers NodeBB versions
+	// without the composer hook, and errors shown outside the composer.
 	function inspectAlert(el) {
 		if (!el || el.dataset.rqSeen === '1') return;
-		var text = String(el.textContent || '');
-		if (!text) return;
-		if (text.indexOf(POST_CODE) !== -1) {
-			el.dataset.rqSeen = '1';
-			return redirect('post');
-		}
-		if (text.indexOf(TOPIC_CODE) !== -1) {
-			el.dataset.rqSeen = '1';
-			return redirect('topic');
-		}
+		var gate = gateFromText(el.textContent);
+		if (!gate) return;
+		el.dataset.rqSeen = '1';
+		redirect(gate);
 	}
 
 	function scanAlerts(root) {
@@ -197,6 +165,7 @@
 	}
 
 	function wireBackup() {
+		wireComposerHook();
 		scanAlerts();
 		if (window.MutationObserver && document.body) {
 			var obs = new MutationObserver(function (muts) {

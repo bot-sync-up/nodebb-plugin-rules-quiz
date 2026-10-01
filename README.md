@@ -35,7 +35,7 @@ before unlocking write access.
 |---|---|
 | NodeBB 2.x | ✅ tested |
 | NodeBB 3.x | ✅ tested |
-| NodeBB 4.x | ✅ tested |
+| NodeBB 4.x | ✅ tested (4.16 end-to-end) |
 | MongoDB | ✅ |
 | Redis | ✅ |
 | PostgreSQL | ✅ |
@@ -181,6 +181,12 @@ All endpoints under `/api/v3/plugins/rules-quiz`.
 
 Two locales bundled: `en-GB` and `he` (with full RTL support). To add a language, drop a new file at `languages/<lang>/rulesquiz.json` with the same key set as `languages/en-GB/rulesquiz.json`.
 
+Templates don't use `[[rulesquiz:key]]` tokens: NodeBB 4.16 stopped translating
+those in rendered pages, and its replacement (`{tx(...)}`) doesn't exist in older
+versions. Instead `lib/i18n.js` passes the strings as template data, so
+`rules.heading` is written `{t.rules_heading}`. `npm test` checks that every
+`{t.key}` exists in both languages.
+
 ## Development
 
 ```
@@ -193,6 +199,8 @@ nodebb-plugin-rules-quiz/
 │  ├─ defaults.js             ← default settings + key namespace
 │  ├─ policy.js               ← pure scoring/gating logic
 │  ├─ lock.js                 ← per-user lock for the write gate
+│  ├─ users.js                ← user fields + groups the policy needs
+│  ├─ i18n.js                 ← language strings for the templates
 │  ├─ controllers.js          ← HTTP controllers
 │  ├─ routes.js               ← route registration
 │  ├─ notify.js               ← notifications + group membership
@@ -235,8 +243,8 @@ token is stored anywhere. Bump `version` in `package.json`, commit, then
 push a matching tag:
 
 ```bash
-git tag v0.8.4
-git push origin v0.8.4
+git tag v0.8.5
+git push origin v0.8.5
 ```
 
 ## License

@@ -18,14 +18,33 @@
 	if (window.__rqDraftRestoreV7) return;
 	window.__rqDraftRestoreV7 = true;
 
-	var STALE_MS = 5 * 60 * 1000; // 5 minutes — drafts older than this expire
+	// Drafts older than this expire. Long enough to read the rules, fail
+	// once and retry — 5 minutes lost real drafts.
+	var STALE_MS = 30 * 60 * 1000;
+
+	// Which topic (reply) or category (new topic) a composer posts to.
+	// NodeBB 4 (Harmony) no longer puts data-tid / data-cid on the composer:
+	// there, a composer with a title field opens a topic and one without
+	// replies to the topic on screen.
+	function composerTarget(composer) {
+		var ds = composer.dataset || {};
+		var tid = parseInt(ds.tid, 10) > 0 ? String(ds.tid) : '';
+		var cid = ds.cid ? String(ds.cid) : '';
+		if (!tid && !cid) {
+			var hasTitle = !!composer.querySelector('input[name="title"], input.title, [component="composer/title"]');
+			var page = (window.ajaxify && window.ajaxify.data) || {};
+			if (hasTitle) cid = page.cid ? String(page.cid) : '';
+			else if (page.tid) tid = String(page.tid);
+		}
+		return { tid: tid, cid: cid };
+	}
 
 	function readDraftFor(composer) {
-		var ds = composer.dataset || {};
-		var tid = ds.tid;
-		var cid = ds.cid;
+		var target = composerTarget(composer);
+		var tid = target.tid;
+		var cid = target.cid;
 		var keys = [];
-		if (tid && tid !== '0') keys.push('rqDraft:reply:' + tid);
+		if (tid) keys.push('rqDraft:reply:' + tid);
 		if (cid) keys.push('rqDraft:topic:' + cid);
 		// Also try a broad fallback when neither is on the dataset.
 		if (!keys.length) {
@@ -116,7 +135,7 @@
 		}, 250);
 	}
 
-	// Sweep stale rqDraft:* keys on page load. A draft older than 5 min
+	// Sweep stale rqDraft:* keys on page load. A draft older than STALE_MS
 	// is almost certainly leftover from a prior session.
 	function sweepStaleDrafts() {
 		try {
@@ -127,7 +146,7 @@
 				if (!k || k.indexOf('rqDraft:') !== 0) continue;
 				try {
 					var v = JSON.parse(localStorage.getItem(k) || '{}');
-					if (!v.at || (now - v.at) > 5 * 60 * 1000) toRemove.push(k);
+					if (!v.at || (now - v.at) > STALE_MS) toRemove.push(k);
 				} catch (_) { toRemove.push(k); }
 			}
 			for (var j = 0; j < toRemove.length; j++) {
@@ -141,6 +160,10 @@
 	// 'topic'). For 'topic', click the New-Topic button on the category
 	// page; for 'post', click a Reply button on the topic page.
 	function autoOpenIfRequested() {
+		// The request is meant for the page the user returns to after the
+		// quiz — leave it alone on the quiz page itself.
+		var base = (window.config && window.config.relative_path) || '';
+		if (window.location.pathname.indexOf(base + '/quiz') === 0) return;
 		var mode = '';
 		try { mode = sessionStorage.getItem('rqAutoOpenComposer') || ''; } catch (_) { /* noop */ }
 		if (!mode) return;
@@ -164,10 +187,17 @@
 		};
 		// The button may not be in the DOM yet on slow page loads.
 		// Try a few times with a short delay.
+		// The reply/new-topic button exists before NodeBB has bound its click
+		// handler, so a click on a fresh page load can do nothing. Keep
+		// clicking (once a second) until a composer actually shows up.
 		var attempts = 0;
 		var iv = setInterval(function () {
 			attempts++;
-			if (clicker() || attempts > 12) clearInterval(iv);
+			if (document.querySelector('[component="composer"]') || attempts > 40) {
+				clearInterval(iv);
+				return;
+			}
+			if (attempts % 4 === 1) clicker();
 		}, 250);
 	}
 

@@ -122,6 +122,8 @@
 		// Don't show on the quiz page itself or the ACP.
 		var p = window.location.pathname || '';
 		if (p === '/quiz' || p.indexOf('/admin') === 0) return;
+		// Guests have no quiz state.
+		if (window.app && window.app.user && !(window.app.user.uid > 0)) return;
 		// Don't re-show if user closed it this session.
 		try { if (sessionStorage.getItem('rqBadgeHidden') === '1') return; } catch (_) { /* noop */ }
 		// The badge is OFF by default — it only mounts if the admin explicitly
