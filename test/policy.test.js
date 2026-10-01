@@ -135,6 +135,66 @@ test('canAttempt: fresh user allowed', () => {
   assert.strictEqual(r.allowed, true);
 });
 
-// eslint-disable-next-line no-console
-console.log('\n' + passed + ' passed, ' + failed + ' failed');
-if (failed > 0) process.exit(1);
+// --- lib/lock.js: single-use token can't be double-spent (v0.8.4) ---------
+const { withUserLock, activeLockCount } = require('../lib/lock');
+
+const asyncTests = [];
+function testAsync(name, fn) { asyncTests.push({ name, fn }); }
+
+// A fake "consume the token" step with an await between read and write,
+// like the real gate (read state from DB, then write the consumed token).
+function makeGate(state) {
+  return async function consume() {
+    const hasToken = state.token > 0;
+    await new Promise((r) => setTimeout(r, 5));
+    if (!hasToken) return 'blocked';
+    state.token = 0;
+    state.posts += 1;
+    return 'passed';
+  };
+}
+
+testAsync('without the lock, two concurrent submits both spend one token (the bug)', async () => {
+  const state = { token: 1, posts: 0 };
+  const consume = makeGate(state);
+  const results = await Promise.all([consume(), consume()]);
+  assert.deepStrictEqual(results.sort(), ['passed', 'passed']);
+});
+testAsync('with withUserLock, only one of two concurrent submits passes', async () => {
+  const state = { token: 1, posts: 0 };
+  const consume = makeGate(state);
+  const results = await Promise.all([withUserLock(7, consume), withUserLock(7, consume)]);
+  assert.deepStrictEqual(results.sort(), ['blocked', 'passed']);
+  assert.strictEqual(state.posts, 1);
+});
+testAsync('withUserLock does not serialise different users', async () => {
+  const order = [];
+  const slow = (tag, ms) => async () => { await new Promise((r) => setTimeout(r, ms)); order.push(tag); };
+  await Promise.all([withUserLock(1, slow('a', 30)), withUserLock(2, slow('b', 5))]);
+  assert.deepStrictEqual(order, ['b', 'a']);
+});
+testAsync('withUserLock releases the lock after an error', async () => {
+  await assert.rejects(withUserLock(9, async () => { throw new Error('boom'); }));
+  const r = await withUserLock(9, async () => 'next');
+  assert.strictEqual(r, 'next');
+  assert.strictEqual(activeLockCount(), 0);
+});
+
+(async () => {
+  for (const t of asyncTests) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await t.fn();
+      passed += 1;
+      // eslint-disable-next-line no-console
+      console.log('  ok   ' + t.name);
+    } catch (e) {
+      failed += 1;
+      // eslint-disable-next-line no-console
+      console.error('  FAIL ' + t.name + '\n         ' + (e && e.message));
+    }
+  }
+  // eslint-disable-next-line no-console
+  console.log('\n' + passed + ' passed, ' + failed + ' failed');
+  if (failed > 0) process.exit(1);
+})();

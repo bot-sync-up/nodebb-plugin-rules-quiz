@@ -19,36 +19,7 @@ const winston = (() => {
 
 const plugin = {};
 
-/**
- * In-memory cache of recent gate passes, keyed by `${uid}:${kind}`.
- * Used to survive the race between NodeBB's filter:post.shouldQueue
- * and the immediately-following filter:post-queue.save / filter:topic.reply:
- * both fire within milliseconds for the same user action, both read the
- * user state BEFORE the first one's db.setUserState await resolves, so a
- * DB-backed grace period is useless. An in-process Map is synchronous and
- * immune to that.
- *
- * Entries older than 15s are swept on the next insert.
- */
-const recentGatePasses = new Map();
-function rememberGatePass(uid, kind) {
-  recentGatePasses.set(uid + ':' + kind, Date.now());
-  if (recentGatePasses.size > 500) {
-    const now = Date.now();
-    for (const [k, t] of recentGatePasses) {
-      if (now - t > 15000) recentGatePasses.delete(k);
-    }
-  }
-}
-function hasRecentGatePass(uid, kind) {
-  const t = recentGatePasses.get(uid + ':' + kind) || 0;
-  // 3s grace window: long enough to cover the multi-hook chain of a SINGLE
-  // write action (filter:post.shouldQueue -> post-queue.save / topic.reply
-  // fire within milliseconds), short enough that a human can't sneak a
-  // second genuine, uncounted write through the grace. Combined with the
-  // 12/min rate limit this bounds any residual bypass to near-zero.
-  return t > 0 && (Date.now() - t) < 3000;
-}
+const { withUserLock } = require('./lib/lock');
 
 /**
  * static:app.load
@@ -199,8 +170,10 @@ plugin.gate = async function (data) {
  *   1. Onboarding gate: user hasn't passed the initial rules quiz at all.
  *      (Same behavior as before — blocks regardless of kind.)
  *   2. Per-kind gate: even after onboarding, the first N replies and the
- *      first M topics each require a fresh mini-quiz. The quiz handshake
- *      is done via a session-scoped token set by POST /submit on a pass.
+ *      first M topics each require a fresh mini-quiz. POST /submit mints a
+ *      single-use token in the user-state hash on a pass; this consumes it.
+ *
+ * Called only from guardShouldQueue, under a per-user lock.
  *
  * @param {'post'|'topic'} kind  `'post'` for replies, `'topic'` for new topics.
  * @param {object} data  NodeBB hook payload.
@@ -239,53 +212,15 @@ async function guardKind(kind, data) {
   const already = Number((state && state[countField]) || 0);
   if (already >= limit) return data; // past the gate window — free to post
 
-  // Token handshake via the user-state hash (DB-backed) — socket.io hook
-  // contexts don't carry req.session, so storing the token only in the
-  // session would make the gate impossible to pass. Session is kept as a
-  // belt-and-braces backup.
+  // Single-use token minted by POST /submit when the mini-quiz is passed.
+  // Stored in the user-state hash (DB) because the write hook has no session.
   const now = Date.now();
   const dbField = kind === 'topic' ? 'topicTokenExp' : 'postTokenExp';
-  const dbExp = Number((state && state[dbField]) || 0);
-  let hasToken = dbExp > now;
-
-  if (!hasToken) {
-    const req = (data && (data.req || (data.data && data.data.req))) || null;
-    const session = req && req.session;
-    const tokenField = kind === 'topic' ? 'rqTopicToken' : 'rqPostToken';
-    const token = session && session[tokenField];
-    if (token && token.exp && token.exp > now) {
-      hasToken = true;
-      try { if (session) delete session[tokenField]; } catch (_) { /* noop */ }
-    }
-  }
-
-  // In-memory grace: a single user action fires multiple hooks within
-  // milliseconds and they race for the same user state. If this uid has
-  // already passed the same-kind gate in the last 10s (via the first hook
-  // in the chain), let the second hook through without touching the DB.
-  if (hasRecentGatePass(uid, kind)) {
-    winston.info('[rules-quiz] ' + kind + ' gate PASSED uid=' + uid + ' (in-memory grace)');
-    return data;
-  }
-
-  // Topic-creation cross-gate: when NodeBB creates a new topic, it fires
-  // BOTH filter:topic.create (our topic gate) AND filter:post.shouldQueue
-  // (our post gate, for the topic's first post). The second one would
-  // demand a post token the user doesn't have. Skip the post gate when
-  // we just consumed the topic gate within the last 10s — same user,
-  // same logical action.
-  if (kind === 'post' && hasRecentGatePass(uid, 'topic')) {
-    winston.info('[rules-quiz] post gate SKIPPED uid=' + uid + ' (covered by recent topic-gate pass)');
-    return data;
-  }
+  const hasToken = Number((state && state[dbField]) || 0) > now;
 
   if (hasToken) {
-    // Mark in-memory grace BEFORE the DB write so the racing hook sees it
-    // synchronously even if its state read is already in-flight.
-    rememberGatePass(uid, kind);
-    // Atomically increment the counter (race-safe) and clear the consumed
-    // token + leave a grace trail via partial-field writes (also race-safe
-    // now that setUserState only touches the fields it's given).
+    // Consume the token and count the write. The caller holds a per-user
+    // lock, so a concurrent submit can't also see this token.
     let newCount = already + 1;
     try {
       newCount = await db.incrUserField(uid, countField, 1);
@@ -309,31 +244,18 @@ async function guardKind(kind, data) {
   throw e;
 }
 
-plugin.guardPost = async function (data) {
-  try {
-    return await guardKind('post', data);
-  } catch (e) {
-    if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
-    winston.error('[rules-quiz] guardPost: ' + e.stack);
-    return data;
-  }
-};
-
-plugin.guardTopic = async function (data) {
-  try {
-    return await guardKind('topic', data);
-  } catch (e) {
-    if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
-    winston.error('[rules-quiz] guardTopic: ' + e.stack);
-    return data;
-  }
-};
-
 /**
- * filter:post.shouldQueue fires for every reply / topic attempt, BEFORE
- * NodeBB decides whether to put the post into its moderation queue.
- * Hooking here lets us gate posts that would otherwise bypass
- * filter:topic.reply / filter:topic.create via the queue path.
+ * filter:post.shouldQueue — the ONLY write gate.
+ *
+ * NodeBB calls posts.shouldQueue(caller.uid, payload) from the user-facing
+ * create/reply API (src/api/topics.js) for every topic and reply a user
+ * submits, before deciding whether to queue it. It is NOT called when a
+ * moderator approves a queued post (posts.submitFromQueue calls
+ * topics.post/reply directly) or splits/merges posts (fork.js calls
+ * Topics.create with the original author's uid). Gating here therefore
+ * covers every user-initiated write exactly once, and never blocks a
+ * moderator acting on a not-yet-passed user's content — which the old
+ * filter:topic.create / filter:topic.reply / filter:post-queue.save hooks did.
  *
  * Payload: { shouldQueue, uid, data }. We leave shouldQueue untouched
  * — we only throw to reject the attempt entirely.
@@ -355,37 +277,11 @@ plugin.guardShouldQueue = async function (payload) {
       + ' title=' + (d.title ? JSON.stringify(d.title).slice(0, 60) : '(none)')
       + ' tid=' + (d.tid || '-') + ' cid=' + (d.cid || '-')
       + ' payloadType=' + (payload.type || '-'));
-    await guardKind(kind, { uid: uid, data: d });
+    await withUserLock(uid, () => guardKind(kind, { uid: uid, data: d }));
     return payload;
   } catch (e) {
     if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
     winston.error('[rules-quiz] guardShouldQueue: ' + e.stack);
-    return payload;
-  }
-};
-
-/**
- * filter:post-queue.save is our final line of defense — fires right
- * before the queued post is actually persisted to the review queue.
- * If shouldQueue was already past us, this still catches it.
- */
-plugin.guardQueued = async function (payload) {
-  try {
-    const uid = payload && payload.uid;
-    if (!uid) return payload;
-    const d = payload.data || {};
-    const type = payload && payload.type;  // 'reply' | 'topic'
-    // Prefer the explicit `type` field set by NodeBB, but fall back to
-    // title-presence so we don't miss new-topic creations whose payload
-    // shape varies between NodeBB versions.
-    const looksLikeTopic = type === 'topic' || !!(typeof d.title === 'string' && d.title.trim().length > 0);
-    const kind = looksLikeTopic ? 'topic' : 'post';
-    winston.info('[rules-quiz] guardQueued uid=' + uid + ' kind=' + kind + ' type=' + (type || '-'));
-    await guardKind(kind, { uid: uid, data: d });
-    return payload;
-  } catch (e) {
-    if (e.code && e.code.indexOf('rules-quiz:') === 0) throw e;
-    winston.error('[rules-quiz] guardQueued: ' + e.stack);
     return payload;
   }
 };

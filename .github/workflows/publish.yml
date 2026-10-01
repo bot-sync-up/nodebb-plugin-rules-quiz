@@ -1,0 +1,45 @@
+name: Publish to npm
+
+# Publishes with npm Trusted Publishing (OIDC). No npm token is stored
+# anywhere: GitHub proves to npm that this workflow in this repo is the one
+# publishing. One-time setup on npmjs.com:
+#   package page -> Settings -> Trusted Publisher -> GitHub Actions
+#   owner: bot-sync-up, repository: nodebb-plugin-rules-quiz,
+#   workflow filename: publish.yml
+#
+# To release: bump "version" in package.json, commit, then
+#   git tag v<version> && git push origin v<version>
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # required for npm trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm (trusted publishing needs npm 11.5.1 or newer)
+        run: npm install -g npm@latest
+
+      - name: Check the tag matches package.json
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG"
+            exit 1
+          fi
+
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm publish

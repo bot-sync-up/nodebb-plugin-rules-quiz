@@ -33,9 +33,6 @@
     { "hook": "action:user.create",         "method": "onUserCreate" },
     { "hook": "action:user.loggedIn",       "method": "onUserLoggedIn" },
     { "hook": "response:router.page",       "method": "gate" },
-    { "hook": "filter:topic.reply",         "method": "guardPost" },
-    { "hook": "filter:topic.create",        "method": "guardTopic" },
-    { "hook": "filter:post-queue.save",     "method": "guardQueued" },
     { "hook": "filter:post.shouldQueue",    "method": "guardShouldQueue" }
   ]
 }

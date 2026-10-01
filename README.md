@@ -188,22 +188,25 @@ nodebb-plugin-rules-quiz/
 ├─ library.js                 ← entry, hook handlers
 ├─ plugin.json                ← NodeBB manifest
 ├─ package.json
-├─ SPEC.md                    ← interface contract for contributors
 ├─ lib/
 │  ├─ db.js                   ← all DB CRUD
 │  ├─ defaults.js             ← default settings + key namespace
 │  ├─ policy.js               ← pure scoring/gating logic
+│  ├─ lock.js                 ← per-user lock for the write gate
 │  ├─ controllers.js          ← HTTP controllers
 │  ├─ routes.js               ← route registration
 │  ├─ notify.js               ← notifications + group membership
+│  ├─ seed.js                 ← starter question bank
 │  └─ util.js                 ← admin gate, JSON helpers
 ├─ static/
 │  ├─ templates/
 │  │  ├─ quiz/index.tpl
-│  │  ├─ quiz/result.tpl
 │  │  └─ admin/plugins/rules-quiz.tpl
 │  ├─ lib/
 │  │  ├─ quiz.js              ← user UI client
+│  │  ├─ gate-redirect.js     ← sends a blocked write to the right quiz
+│  │  ├─ draft-restore.js     ← restores the composer draft after the quiz
+│  │  ├─ status-badge.js      ← optional debug badge (off by default)
 │  │  └─ admin.js             ← ACP client
 │  └─ style/
 │     ├─ quiz.less
@@ -220,6 +223,20 @@ cd /path/to/NodeBB
 ln -s /path/to/nodebb-plugin-rules-quiz node_modules/nodebb-plugin-rules-quiz
 ./nodebb activate nodebb-plugin-rules-quiz
 ./nodebb dev
+```
+
+Unit tests: `npm test`.
+
+## Releasing
+
+Releases are published to npm by GitHub Actions
+(`.github/workflows/publish.yml`) using npm Trusted Publishing, so no npm
+token is stored anywhere. Bump `version` in `package.json`, commit, then
+push a matching tag:
+
+```bash
+git tag v0.8.4
+git push origin v0.8.4
 ```
 
 ## License

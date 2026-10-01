@@ -333,7 +333,18 @@ define('forum/plugins/rules-quiz', [
 	}
 
 	/**
-	 * Begin (or restart) the quiz: reset state and render question 0.
+	 * Retry after a failed attempt. The server serves each question set once
+	 * and clears it on submit, so a retry must reload the page to draw a fresh
+	 * random sample. Replaying the same questions would let a user pass by
+	 * elimination after seeing which answers were wrong. The page's
+	 * ?mode=&returnTo= query survives the reload.
+	 */
+	function retryWithFreshQuestions() {
+		window.location.reload();
+	}
+
+	/**
+	 * Begin the quiz: reset state and render question 0.
 	 */
 	function startQuiz() {
 		state.idx = 0;
@@ -691,6 +702,12 @@ define('forum/plugins/rules-quiz', [
 				heading = '[[rulesquiz:result.cooldown_remaining, ' + esc(formatCooldown(cooldownMs)) + ']]';
 				msg = '[[rulesquiz:error.cooldown]]';
 				showCooldown = true;
+			} else if (resp.reason === 'no_active_attempt') {
+				// The served question set was already used (or never loaded).
+				icon = '🔄';
+				heading = '[[rulesquiz:result.failed]]';
+				msg = '[[rulesquiz:error.no_active_attempt]]';
+				showRetry = true;
 			} else if (resp.reason === 'rate_limited') {
 				cooldownMs = Number(resp.retryAfterMs || 0);
 				heading = '[[rulesquiz:result.cooldown_remaining, ' + esc(formatCooldown(cooldownMs)) + ']]';
@@ -828,7 +845,7 @@ define('forum/plugins/rules-quiz', [
 			}
 			if (showRetry) {
 				const retryBtn = document.getElementById('rq-retry-btn');
-				if (retryBtn) retryBtn.addEventListener('click', function () { state.answers = {}; startQuiz(); });
+				if (retryBtn) retryBtn.addEventListener('click', retryWithFreshQuestions);
 			}
 			if (showCooldown && cooldownMs > 0) {
 				startCooldownCountdown(cooldownMs);
@@ -878,10 +895,7 @@ define('forum/plugins/rules-quiz', [
 					translator.translate('[[rulesquiz:result.try_again]]', function (t) {
 						btn.textContent = t;
 					});
-					btn.addEventListener('click', function () {
-						state.answers = {};
-						startQuiz();
-					});
+					btn.addEventListener('click', retryWithFreshQuestions);
 					wrap.appendChild(btn);
 				}
 				return;

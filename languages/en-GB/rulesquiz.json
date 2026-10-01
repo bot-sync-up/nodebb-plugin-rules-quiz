@@ -207,6 +207,7 @@
   "error.need_post_quiz": "You must pass a short quiz before posting a reply.",
   "error.need_topic_quiz": "You must pass a quiz before creating a new topic.",
   "error.network": "A network error occurred. Please try again.",
+  "error.no_active_attempt": "This set of questions was already submitted. Load a new set to try again.",
   "error.rate_limited": "Too many attempts. Please wait a moment and try again.",
   "fail": "Fail",
   "intro.heading": "Before you begin",
